@@ -17,16 +17,29 @@
             <h1>ChessBuddy</h1>
         </header>
 
+        <aside>
+            <canvas id="clocks" width="280" height="130">
+                Your browser does not support the canvas element.
+            </canvas>
+
+            <div id="history">
+            </div>
+        </aside>
+
         <canvas id="board" width="400" height="400">
             Your browser does not support the canvas element.
         </canvas>
         <script type="text/javascript">
             var canvas = document.getElementById("board");
+            var clocks = document.getElementById("clocks");
             var ws = new WebSocket("ws://{{.}}/ws");
-            var chess = new ChessGame(canvas, ws);
+            var chess = new ChessGame(canvas, clocks, ws);
         </script>
 
         <footer>
+            <div class="stats">
+                <span id="numPlayers">0</span> players online
+            </div>
             © Christoph Hack, 2012. Grab the source on
             <a href="https://github.com/tux21b/ChessBuddy">GitHub</a>.<br />
             Proudly powered by <a href="http://golang.org/">Go 1</a>!

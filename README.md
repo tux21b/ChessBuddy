@@ -12,6 +12,9 @@ Demo
 
 * [http://www.tux21b.org:8000/](http://www.tux21b.org:8000/)
 
+Hint: Open the page in two different tabs, if there aren't any other
+visitors around.
+
 
 Missing Features
 ----------------

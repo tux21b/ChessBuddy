@@ -26,7 +26,7 @@ a:hover {
 
 div.wrap {
   margin: 1.5em auto;
-  width: 400px;
+  width: 700px;
 }
 
 header {
@@ -50,9 +50,23 @@ footer {
   margin-top: .5em;
 }
 
+footer div.stats {
+  float: right;
+  text-align: right;
+}
+
+aside {
+  float: right;
+  width: 280px;
+}
+
 #board {
   -moz-user-select: none;
   -khtml-user-select: none;
   -webkit-user-select: none;
   user-select: none;
+}
+
+#history {
+  margin-top: 1em;
 }

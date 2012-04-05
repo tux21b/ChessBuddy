@@ -8,9 +8,11 @@
 var SYMBOLS = ["♟", "♞", "♝", "♜", "♛", "♚", " ", "♔", "♕", "♖", "♗", "♘", "♙"];
 
 
-function ChessGame(canvas, websocket) {
+function ChessGame(canvas, clocks, websocket) {
     this.canvas = canvas;
-    this.ctx = canvas.getContext("2d");
+    this.canvas_ctx = canvas.getContext("2d");
+    this.clocks = clocks;
+    this.clocks_ctx = clocks.getContext("2d");
     this.color = 0;
     this.turn = 0;
     this.board = [];
@@ -31,8 +33,8 @@ function ChessGame(canvas, websocket) {
 
 
 ChessGame.prototype.render = function() {
-    var ctx = this.ctx;
-    var size = Math.min(canvas.width, canvas.height) / 9.0;
+    var ctx = this.canvas_ctx;
+    var size = Math.min(this.canvas.width, this.canvas.height) / 9.0;
     var border = 0.5*size;
 
     /* draw the checker board */
@@ -76,16 +78,53 @@ ChessGame.prototype.render = function() {
     }
 
     /* draw messages */
+    var msg = "";
     if (this.color == 0) {
+        msg = "Waiting for another player...";
+    } else if (this.status == 5) {
+        msg = "Opponent left... Reload?";
+    }
+    if (msg) {
+        ctx.fillStyle = "rgba(220, 220, 220, 0.8)";
+        ctx.fillRect(0, 3.75*size, 9*size, 1.5*size);
         ctx.fillStyle = "#000000";
         ctx.font = '20pt "Helvetica Neue", Helvetica, Arial, sans-serif';
-        ctx.fillText("Waiting for another player...", 4.5*size, 4.5*size);
-    } else if (this.status == 5) {
-        ctx.fillStyle = "#000000";
-        ctx.font = "20pt Arial";
-        ctx.fillText("Opponent left... Reload?", 4.5*size, 4.5*size);
+        ctx.fillText(msg, 4.5*size, 4.5*size);
     }
+
+    /* draw clocks */
+    this.renderClock(0, 0, 130, 0, (this.color != 0) && ((this.turn & 1) == 1));
+    this.renderClock(150, 0, 130, 0.25, (this.color != 0) && ((this.turn & 1) == 0));
 };
+
+ChessGame.prototype.renderClock = function(x, y, size, t, active) {
+    var ctx = this.clocks_ctx;
+    ctx.fillStyle = "#cccccc";
+    ctx.beginPath();
+    ctx.arc(x+0.5*size, y+0.5*size, 0.5*size, 0, Math.PI*2, true);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(x+0.5*size, y+0.5*size, 0.45*size, 0, Math.PI*2, true);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = active ? "#ff0000" : "#000000";
+    ctx.beginPath();
+    ctx.arc(x+0.5*size, y+0.5*size, 0.05*size, 0, Math.PI*2, true);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = active ? "#ff0000" : "#000000";
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.moveTo(x+0.5*size, y+0.5*size);
+    ctx.lineTo(x+0.5*size+0.475*size*Math.sin(t*Math.PI),
+        y+0.5*size-0.475*size*Math.cos(t*Math.PI));
+    ctx.closePath();
+    ctx.stroke();
+}
 
 
 ChessGame.prototype.click = function(e) {
@@ -100,8 +139,8 @@ ChessGame.prototype.click = function(e) {
         y = e.clientY + document.body.scrollTop +
             document.documentElement.scrollTop;
     }
-    x -= canvas.offsetLeft;
-    y -= canvas.offsetTop;
+    x -= this.canvas.offsetLeft;
+    y -= this.canvas.offsetTop;
 
     /* convert to field coordinates */
     var size = Math.min(canvas.width, canvas.height) / 9.0;
@@ -134,6 +173,7 @@ ChessGame.prototype.process = function(e) {
         this.board[msg.By*8+msg.Bx] = this.board[msg.Ay*8+msg.Ax];
         this.board[msg.Ay*8+msg.Ax] = 0;
         this.turn = msg.Turn+1;
+        document.getElementById("history").innerHTML += msg.History + " ";
         this.render();
     }
     else if (msg.Cmd == "start") {
@@ -145,4 +185,5 @@ ChessGame.prototype.process = function(e) {
     else if (msg.Cmd == "ping") {
         ws.send(JSON.stringify({Cmd: "pong"}));
     }
+    document.getElementById("numPlayers").innerHTML = msg.NumPlayers;
 }

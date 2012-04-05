@@ -7,10 +7,12 @@ package main
 
 import (
     "code.google.com/p/go.net/websocket"
+    "fmt"
     "html/template"
     "log"
     "math/rand"
     "net/http"
+    "sync/atomic"
 )
 
 type figur int
@@ -118,12 +120,14 @@ func (b *Board) freeWay(ax, ay, bx, by int) bool {
 // General message struct which is used for parsing client requests and sending
 // back responses.
 type Message struct {
-    Cmd    string
-    Turn   int
-    Ax, Ay int
-    Bx, By int
-    Board  *Board
-    Color  int
+    Cmd        string
+    Turn       int
+    Ax, Ay     int
+    Bx, By     int
+    Board      *Board
+    Color      int
+    NumPlayers int32
+    History    string
 }
 
 type Player struct {
@@ -134,7 +138,8 @@ type Player struct {
 
 // Check wethever the player is still connected by sending a ping command.
 func (p Player) Alive() bool {
-    if err := websocket.JSON.Send(p.Conn, Message{Cmd: "ping"}); err != nil {
+    if err := websocket.JSON.Send(p.Conn, Message{Cmd: "ping",
+        NumPlayers: atomic.LoadInt32(&numPlayers)}); err != nil {
         return false
     }
     var msg Message
@@ -146,6 +151,9 @@ func (p Player) Alive() bool {
 
 // Available Players which are currently looking for a taff opponent.
 var available = make(chan Player, 100)
+
+// Total number of connected players
+var numPlayers int32 = 0
 
 // GoRoutine for hooking up pairs of available players.
 func hookUp() {
@@ -178,11 +186,13 @@ func play(a, b Player) {
     a.Color = WHITE
     b.Color = BLACK
 
-    err := websocket.JSON.Send(a.Conn, Message{Cmd: "start", Board: board, Color: a.Color, Turn: turn})
+    err := websocket.JSON.Send(a.Conn, Message{Cmd: "start", Board: board,
+        Color: a.Color, Turn: turn, NumPlayers: atomic.LoadInt32(&numPlayers)})
     if err != nil {
         return
     }
-    err = websocket.JSON.Send(b.Conn, Message{Cmd: "start", Board: board, Color: b.Color, Turn: turn})
+    err = websocket.JSON.Send(b.Conn, Message{Cmd: "start", Board: board,
+        Color: b.Color, Turn: turn, NumPlayers: atomic.LoadInt32(&numPlayers)})
     if err != nil {
         return
     }
@@ -192,16 +202,37 @@ func play(a, b Player) {
         if err := websocket.JSON.Receive(a.Conn, &msg); err != nil {
             break
         }
+        msg.History = board.History(msg.Ax, msg.Ay, msg.Bx, msg.By)
         if msg.Cmd == "move" && msg.Turn == turn &&
             ((a.Color == WHITE && turn&1 == 1) ||
                 (a.Color == BLACK && turn&1 == 0)) &&
             board.Move(msg.Ax, msg.Ay, msg.Bx, msg.By) {
+            msg.NumPlayers = atomic.LoadInt32(&numPlayers)
+            if turn&1 == 1 {
+                msg.History = fmt.Sprintf("%d. %s", (turn+1)/2, msg.History)
+            }
             websocket.JSON.Send(a.Conn, msg)
             websocket.JSON.Send(b.Conn, msg)
             a, b = b, a
             turn++
         }
     }
+}
+
+// Generates a single log entry for the history.
+func (b *Board) History(ax, ay, bx, by int) string {
+    if !b.ValidMove(ax, ay, bx, by) {
+        return ""
+    }
+    cols := []string{"a", "b", "c", "d", "e", "f", "g", "h"}
+    symb := []string{"", "N", "B", "R", "Q", "K", "",
+        "K", "Q", "R", "B", "N", ""}
+    if b[by*SIZE+bx] == EMPTY {
+        return fmt.Sprintf("%s%s%d-%s%d", symb[b[ay*SIZE+ax]+6], cols[ax],
+            ay+1, cols[bx], by+1)
+    }
+    return fmt.Sprintf("%s%s%dx%s%d", symb[b[ay*SIZE+ax]+6], cols[ax],
+        ay+1, cols[bx], by+1)
 }
 
 var tmpl = template.Must(template.ParseFiles("chess.html"))
@@ -221,6 +252,7 @@ func handleFile(path string) http.HandlerFunc {
 }
 
 func handleChess(ws *websocket.Conn) {
+    atomic.AddInt32(&numPlayers, 1)
     log.Printf("Connected: %v", ws.RemoteAddr())
 
     player := Player{Conn: ws, Exit: make(chan bool)}
@@ -229,6 +261,7 @@ func handleChess(ws *websocket.Conn) {
     <-player.Exit
     ws.Close()
     log.Printf("Disconnected: %v", ws.RemoteAddr())
+    atomic.AddInt32(&numPlayers, -1)
 }
 
 func main() {
