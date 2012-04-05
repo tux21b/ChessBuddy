@@ -1,0 +1,35 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+    <title>ChessBuddy</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <link rel="stylesheet" type="text/css" href="/chess.css" />
+    <script type="text/javascript" src="chess.js"></script>
+</head>
+<body>
+    <div class="wrap">
+        <header>
+            <p class="intro">
+                Play chess with Go, HTML5,<br />
+                WebSockets and random strangers!
+            </p>
+            <h1>ChessBuddy</h1>
+        </header>
+
+        <canvas id="board" width="400" height="400">
+            Your browser does not support the canvas element.
+        </canvas>
+        <script type="text/javascript">
+            var canvas = document.getElementById("board");
+            var ws = new WebSocket("ws://{{.}}/ws");
+            var chess = new ChessGame(canvas, ws);
+        </script>
+
+        <footer>
+            © Christoph Hack, 2012. Grab the source on
+            <a href="https://github.com/tux21b/ChessBuddy">GitHub</a>.<br />
+            Proudly powered by <a href="http://golang.org/">Go 1</a>!
+        </footer>
+    </div>
+</body>
+</html>

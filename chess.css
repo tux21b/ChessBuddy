@@ -1,0 +1,58 @@
+/**
+ * ChessBuddy - Play chess with Go, HTML5, WebSockets and random strangers!
+ *
+ * Copyright (c) 2012 by Christoph Hack <christoph@tux21b.org>
+ * All rights reserved. Distributed under the Simplified BSD License.
+ */
+
+body {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 13px;
+  line-height: 18px;
+  color: #333333;
+  background-color: #ffffff;
+  margin: 0;
+}
+
+a {
+  color: #0088cc;
+  text-decoration: none;
+}
+
+a:hover {
+  color: #005580;
+  text-decoration: underline;
+}
+
+div.wrap {
+  margin: 1.5em auto;
+  width: 400px;
+}
+
+header {
+  border-bottom: 1px solid #ccc;
+  margin-bottom: 1em;
+}
+
+header h1 {
+  margin: 0 0 .2em 0;
+  padding: .5em 0 .4em;
+}
+
+header p.intro {
+  float: right;
+  width: 60%;
+  text-align: right;
+  margin: 0;
+}
+
+footer {
+  margin-top: .5em;
+}
+
+#board {
+  -moz-user-select: none;
+  -khtml-user-select: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
