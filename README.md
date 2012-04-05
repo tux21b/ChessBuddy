@@ -10,7 +10,7 @@ Play chess with Go, HTML5, WebSockets and random strangers!
 Demo
 ----
 
-* http://www.tux21b.org:8000/
+* [http://www.tux21b.org:8000/](http://www.tux21b.org:8000/)
 
 
 Missing Features
