@@ -65,11 +65,13 @@ func (b *Board) ValidMove(ax, ay, bx, by int) bool {
     case KNIGHT * WHITE, KNIGHT * BLACK:
         return (ax-bx)*(ax-bx)+(ay-by)*(ay-by) == 5
     case PAWN * WHITE:
-        return ax == bx && (ay+1 == by || (ay == 1 && by == 3)) ||
-            ((ax-bx)*(ax-bx) == 1 && ay+1 == by && b[by*SIZE+bx] < 0)
+        return (ax == bx && (ay+1 == by || (ay == 1 && by == 3)) &&
+            b[by*SIZE+bx] == EMPTY) || ((ax-bx)*(ax-bx) == 1 &&
+            ay+1 == by && b[by*SIZE+bx] != EMPTY)
     case PAWN * BLACK:
-        return ax == bx && (ay-1 == by || (ay == 6 && by == 4)) ||
-            ((ax-bx)*(ax-bx) == 1 && ay+1 == by && b[by*SIZE+bx] > 0)
+        return (ax == bx && (ay-1 == by || (ay == 6 && by == 4)) &&
+            b[by*SIZE+bx] == EMPTY) || ((ax-bx)*(ax-bx) == 1 &&
+            ay-1 == by && b[by*SIZE+bx] != EMPTY)
     case BISHOP * WHITE, BISHOP * BLACK:
         return (ax-bx)*(ax-bx) == (ay-by)*(ay-by) && b.freeWay(ax, ay, bx, by)
     case ROOK * WHITE, ROOK * BLACK:

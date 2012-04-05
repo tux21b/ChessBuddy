@@ -9,7 +9,7 @@ body {
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
   font-size: 13px;
   line-height: 18px;
-  color: #333333;
+  color: #222222;
   background-color: #ffffff;
   margin: 0;
 }
@@ -44,6 +44,9 @@ header p.intro {
   width: 60%;
   text-align: right;
   margin: 0;
+  font-weight: bold;
+  font-style: italic;
+  color: #444;
 }
 
 footer {
@@ -67,6 +70,15 @@ aside {
   user-select: none;
 }
 
+#clocks {
+  margin-bottom: 1em;
+}
+
 #history {
-  margin-top: 1em;
+  margin-top: .5em;
+}
+
+label {
+  font-weight: bold;
+  color: #333;
 }

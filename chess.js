@@ -93,13 +93,14 @@ ChessGame.prototype.render = function() {
     }
 
     /* draw clocks */
-    this.renderClock(0, 0, 130, 0, (this.color != 0) && ((this.turn & 1) == 1));
-    this.renderClock(150, 0, 130, 0.25, (this.color != 0) && ((this.turn & 1) == 0));
+    this.renderClock(0, 0, 130, 0, 1);
+    this.renderClock(150, 0, 130, 0.25, -1);
 };
 
-ChessGame.prototype.renderClock = function(x, y, size, t, active) {
+ChessGame.prototype.renderClock = function(x, y, size, t, color) {
     var ctx = this.clocks_ctx;
-    ctx.fillStyle = "#cccccc";
+    var active = (this.color != 0) && ((this.turn & 1) == (color > 0 ? 1 : 0));
+    ctx.fillStyle = "#cfcfd1";
     ctx.beginPath();
     ctx.arc(x+0.5*size, y+0.5*size, 0.5*size, 0, Math.PI*2, true);
     ctx.closePath();
@@ -124,6 +125,12 @@ ChessGame.prototype.renderClock = function(x, y, size, t, active) {
         y+0.5*size-0.475*size*Math.cos(t*Math.PI));
     ctx.closePath();
     ctx.stroke();
+
+    ctx.fillStyle = "#888";
+    ctx.font = 'bold 12pt "Helvetica Neue", Helvetica, Arial, sans-serif';
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(color > 0 ? "white" : "black", x+0.5*size, y+0.7*size);
 }
 
 
