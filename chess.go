@@ -13,6 +13,7 @@ import (
     "math/rand"
     "net/http"
     "sync/atomic"
+    "time"
 )
 
 type figur int
@@ -122,20 +123,22 @@ func (b *Board) freeWay(ax, ay, bx, by int) bool {
 // General message struct which is used for parsing client requests and sending
 // back responses.
 type Message struct {
-    Cmd        string
-    Turn       int
-    Ax, Ay     int
-    Bx, By     int
-    Board      *Board
-    Color      int
-    NumPlayers int32
-    History    string
+    Cmd                    string
+    Turn                   int
+    Ax, Ay                 int
+    Bx, By                 int
+    Board                  *Board
+    Color                  int
+    NumPlayers             int32
+    History                string
+    RemainingA, RemainingB time.Duration
 }
 
 type Player struct {
-    Conn  *websocket.Conn
-    Exit  chan bool
-    Color int
+    Conn      *websocket.Conn
+    Exit      chan bool
+    Color     int
+    Remaining time.Duration
 }
 
 // Check wethever the player is still connected by sending a ping command.
@@ -187,18 +190,23 @@ func play(a, b Player) {
     }
     a.Color = WHITE
     b.Color = BLACK
+    a.Remaining = 5 * time.Minute
+    b.Remaining = 5 * time.Minute
 
     err := websocket.JSON.Send(a.Conn, Message{Cmd: "start", Board: board,
-        Color: a.Color, Turn: turn, NumPlayers: atomic.LoadInt32(&numPlayers)})
+        Color: a.Color, Turn: turn, NumPlayers: atomic.LoadInt32(&numPlayers),
+        RemainingA: a.Remaining, RemainingB: b.Remaining})
     if err != nil {
         return
     }
     err = websocket.JSON.Send(b.Conn, Message{Cmd: "start", Board: board,
-        Color: b.Color, Turn: turn, NumPlayers: atomic.LoadInt32(&numPlayers)})
+        Color: b.Color, Turn: turn, NumPlayers: atomic.LoadInt32(&numPlayers),
+        RemainingA: a.Remaining, RemainingB: b.Remaining})
     if err != nil {
         return
     }
 
+    start := time.Now()
     for {
         var msg Message
         if err := websocket.JSON.Receive(a.Conn, &msg); err != nil {
@@ -212,6 +220,16 @@ func play(a, b Player) {
             msg.NumPlayers = atomic.LoadInt32(&numPlayers)
             if turn&1 == 1 {
                 msg.History = fmt.Sprintf("%d. %s", (turn+1)/2, msg.History)
+            }
+            now := time.Now()
+            a.Remaining -= now.Sub(start)
+            if a.Remaining < 0 {
+                a.Remaining = 0
+            }
+            start = now
+            msg.RemainingA, msg.RemainingB = a.Remaining, b.Remaining
+            if a.Color == BLACK {
+                msg.RemainingA, msg.RemainingB = b.Remaining, a.Remaining
             }
             websocket.JSON.Send(a.Conn, msg)
             websocket.JSON.Send(b.Conn, msg)

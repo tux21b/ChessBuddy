@@ -21,6 +21,9 @@ function ChessGame(canvas, clocks, websocket) {
         this.board[i] = 0;
     this.ws = websocket;
     this.status = 0;
+    this.totalTime = 0;
+    this.remainingA = 0;
+    this.remainingB = 0;
 
     var _this = this;
     this.ws.onmessage = function(e) { _this.process(e); };
@@ -29,6 +32,16 @@ function ChessGame(canvas, clocks, websocket) {
         _this.click(e)
     });
     this.render();
+
+    this.clocks_int = window.setInterval(function() {
+        _this.tick();
+    }, 1000);
+
+    window.onbeforeunload = function(e) {
+        if (_this.status == 0 && _this.color != 0) {
+            return "Leaving the page will cancel the current game.";
+        }
+    };
 }
 
 
@@ -92,9 +105,10 @@ ChessGame.prototype.render = function() {
         ctx.fillText(msg, 4.5*size, 4.5*size);
     }
 
-    /* draw clocks */
-    this.renderClock(0, 0, 130, 0, 1);
-    this.renderClock(150, 0, 130, 0.25, -1);
+    this.renderClock(0, 0, 130,
+        this.totalTime > 0 ? this.remainingA / this.totalTime : 0, 1);
+    this.renderClock(150, 0, 130,
+        this.totalTime > 0 ? this.remainingB / this.totalTime : 0, -1);
 };
 
 ChessGame.prototype.renderClock = function(x, y, size, t, color) {
@@ -111,6 +125,12 @@ ChessGame.prototype.renderClock = function(x, y, size, t, color) {
     ctx.closePath();
     ctx.fill();
 
+    ctx.fillStyle = "#888";
+    ctx.font = 'bold 12pt "Helvetica Neue", Helvetica, Arial, sans-serif';
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(color > 0 ? "white" : "black", x+0.5*size, y+0.7*size);
+
     ctx.fillStyle = active ? "#ff0000" : "#000000";
     ctx.beginPath();
     ctx.arc(x+0.5*size, y+0.5*size, 0.05*size, 0, Math.PI*2, true);
@@ -121,16 +141,10 @@ ChessGame.prototype.renderClock = function(x, y, size, t, color) {
     ctx.lineWidth = 8;
     ctx.beginPath();
     ctx.moveTo(x+0.5*size, y+0.5*size);
-    ctx.lineTo(x+0.5*size+0.475*size*Math.sin(t*Math.PI),
-        y+0.5*size-0.475*size*Math.cos(t*Math.PI));
+    ctx.lineTo(x+0.5*size+0.475*size*Math.sin(t*2*Math.PI),
+        y+0.5*size-0.475*size*Math.cos(t*2*Math.PI));
     ctx.closePath();
     ctx.stroke();
-
-    ctx.fillStyle = "#888";
-    ctx.font = 'bold 12pt "Helvetica Neue", Helvetica, Arial, sans-serif';
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(color > 0 ? "white" : "black", x+0.5*size, y+0.7*size);
 }
 
 
@@ -180,6 +194,8 @@ ChessGame.prototype.process = function(e) {
         this.board[msg.By*8+msg.Bx] = this.board[msg.Ay*8+msg.Ax];
         this.board[msg.Ay*8+msg.Ax] = 0;
         this.turn = msg.Turn+1;
+        this.remainingA = msg.RemainingA;
+        this.remainingB = msg.RemainingB;
         document.getElementById("history").innerHTML += msg.History + " ";
         this.render();
     }
@@ -187,10 +203,31 @@ ChessGame.prototype.process = function(e) {
         this.board = msg.Board;
         this.color = msg.Color;
         this.turn = 1;
+        this.totalTime = msg.RemainingA;
+        this.remainingA = msg.RemainingA;
+        this.remainingB = msg.RemainingB;
         this.render();
     }
     else if (msg.Cmd == "ping") {
         ws.send(JSON.stringify({Cmd: "pong"}));
     }
     document.getElementById("numPlayers").innerHTML = msg.NumPlayers;
+}
+
+ChessGame.prototype.tick = function() {
+    if (this.status == 0) {
+        if ((this.turn % 2) == 1) {
+            this.remainingA -= 1000000000;
+            if (this.remainingA < 0)
+                this.remainingA = 0;
+        } else {
+            this.remainingB -= 1000000000;
+            if (this.remainingB < 0)
+                this.remainingB = 0;
+        }
+    }
+    this.renderClock(0, 0, 130,
+        this.totalTime > 0 ? this.remainingA / this.totalTime : 0, 1);
+    this.renderClock(150, 0, 130,
+        this.totalTime > 0 ? this.remainingB / this.totalTime : 0, -1);
 }
