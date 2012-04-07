@@ -20,15 +20,21 @@ function ChessGame(canvas, clocks, websocket) {
     for (var i = 0; i < 64; i++)
         this.board[i] = 0;
     this.ws = websocket;
-    this.status = 0;
     this.totalTime = 0;
     this.remainingA = 0;
     this.remainingB = 0;
     this.msg = null;
 
     var _this = this;
-    this.ws.onmessage = function(e) { _this.process(e); };
-    this.ws.onclose = function(e) { _this.status = 5; _this.render(); };
+    this.ws.onmessage = function(e) {
+        _this.process(e);
+    };
+    this.ws.onclose = function(e) {
+        if (!_this.msg) {
+            _this.msg = "Connection lost... Reload?";
+        }
+        _this.render();
+    };
     this.canvas.addEventListener('click', function(e) {
         _this.click(e)
     });
@@ -39,7 +45,7 @@ function ChessGame(canvas, clocks, websocket) {
     }, 1000);
 
     window.onbeforeunload = function(e) {
-        if (_this.status == 0 && _this.color != 0) {
+        if (!_this.msg) {
             return "Leaving the page will cancel the current game.";
         }
     };
@@ -105,6 +111,7 @@ ChessGame.prototype.render = function() {
     this.renderClock(150, 0, 130,
         this.totalTime > 0 ? this.remainingB / this.totalTime : 0, -1);
 };
+
 
 ChessGame.prototype.renderClock = function(x, y, size, t, color) {
     var ctx = this.clocks_ctx;
@@ -223,7 +230,7 @@ ChessGame.prototype.process = function(e) {
 }
 
 ChessGame.prototype.tick = function() {
-    if (this.status == 0) {
+    if (!this.msg) {
         if ((this.turn % 2) == 1) {
             this.remainingA -= 1000000000;
             if (this.remainingA < 0)

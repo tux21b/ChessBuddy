@@ -25,8 +25,9 @@ a:hover {
 }
 
 div.wrap {
-  margin: 1.5em auto;
+  margin: 0 auto;
   width: 700px;
+  padding: 1.5em;
 }
 
 header {
