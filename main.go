@@ -7,6 +7,7 @@ package main
 
 import (
     "code.google.com/p/go.net/websocket"
+    "flag"
     "fmt"
     "html/template"
     "log"
@@ -51,6 +52,15 @@ func (p Player) Alive() bool {
     return msg.Cmd == "pong"
 }
 
+func (p Player) String() string {
+    if p.Color == WHITE {
+        return "White"
+    } else if p.Color == BLACK {
+        return "Black"
+    }
+    return "Unknown"
+}
+
 // Available Players which are currently looking for a taff opponent.
 var available = make(chan Player, 100)
 
@@ -86,8 +96,8 @@ func play(a, b Player) {
     }
     a.Color = WHITE
     b.Color = BLACK
-    a.Remaining = 5 * time.Minute
-    b.Remaining = 5 * time.Minute
+    a.Remaining = *timeLimit
+    b.Remaining = *timeLimit
 
     a.Out <- Message{Cmd: "start", Color: a.Color, Turn: game.Turn(),
         NumPlayers: atomic.LoadInt32(&numPlayers),
@@ -103,13 +113,9 @@ func play(a, b Player) {
         if err := websocket.JSON.Receive(a.Conn, &msg); err != nil {
             if err, ok := err.(net.Error); ok && err.Timeout() {
                 a.Remaining = 0
-                winner := "White"
-                if b.Color == BLACK {
-                    winner = "Black"
-                }
                 msg = Message{
                     Cmd:  "msg",
-                    Text: fmt.Sprintf("Out of time: %s wins!", winner),
+                    Text: fmt.Sprintf("Out of time: %v wins!", b),
                 }
                 b.Out <- msg
                 a.Out <- msg
@@ -189,7 +195,14 @@ func handleWS(ws *websocket.Conn) {
     }
 }
 
+var timeLimit *time.Duration = flag.Duration("time", 5*time.Minute,
+    "time limit per side (sudden death, no add)")
+var listenAddr *string = flag.String("http", ":8000",
+    "listen on this http address")
+
 func main() {
+    flag.Parse()
+
     http.HandleFunc("/", handleIndex)
     http.HandleFunc("/chess.js", handleFile("chess.js"))
     http.HandleFunc("/chess.css", handleFile("chess.css"))
@@ -198,7 +211,7 @@ func main() {
 
     go hookUp()
 
-    if err := http.ListenAndServe(":8000", nil); err != nil {
-        log.Fatalf("Error: %v", err)
+    if err := http.ListenAndServe(*listenAddr, nil); err != nil {
+        log.Fatalf("http.ListenAndServe: %v", err)
     }
 }
