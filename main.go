@@ -158,6 +158,10 @@ var tmpl = template.Must(template.ParseFiles("chess.html"))
 
 // Serve the index page.
 func handleIndex(w http.ResponseWriter, r *http.Request) {
+    if r.URL.Path != "/" {
+        http.Error(w, "Not Found", http.StatusNotFound)
+        return
+    }
     if err := tmpl.Execute(w, r.Host); err != nil {
         log.Printf("tmpl.Execute: %v", err)
     }
@@ -207,6 +211,7 @@ func main() {
     http.HandleFunc("/chess.js", handleFile("chess.js"))
     http.HandleFunc("/chess.css", handleFile("chess.css"))
     http.HandleFunc("/bg.png", handleFile("bg.png"))
+    http.HandleFunc("/favicon.ico", handleFile("favicon.ico"))
     http.Handle("/ws", websocket.Handler(handleWS))
 
     go hookUp()
