@@ -10,7 +10,7 @@ body {
   font-size: 13px;
   line-height: 18px;
   color: #222222;
-  background-color: #ffffff;
+  background: #ffffff url("/bg.png");
   margin: 0;
 }
 
@@ -30,13 +30,14 @@ div.wrap {
 }
 
 header {
-  border-bottom: 1px solid #ccc;
+  border-bottom: 2px solid #aaa;
   margin-bottom: 1em;
 }
 
 header h1 {
   margin: 0 0 .2em 0;
   padding: .5em 0 .4em;
+  font-family: "Oleo Script", "Helvetica Neue", Helvetica, Arial, sans-serif;
 }
 
 header h1 a, header h1 a:hover {

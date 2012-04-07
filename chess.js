@@ -24,6 +24,7 @@ function ChessGame(canvas, clocks, websocket) {
     this.totalTime = 0;
     this.remainingA = 0;
     this.remainingB = 0;
+    this.msg = null;
 
     var _this = this;
     this.ws.onmessage = function(e) { _this.process(e); };
@@ -91,18 +92,12 @@ ChessGame.prototype.render = function() {
     }
 
     /* draw messages */
-    var msg = "";
-    if (this.color == 0) {
-        msg = "Waiting for another player...";
-    } else if (this.status == 5) {
-        msg = "Opponent left... Reload?";
-    }
-    if (msg) {
+    if (this.msg) {
         ctx.fillStyle = "rgba(220, 220, 220, 0.8)";
         ctx.fillRect(0, 3.75*size, 9*size, 1.5*size);
         ctx.fillStyle = "#000000";
         ctx.font = '20pt "Helvetica Neue", Helvetica, Arial, sans-serif';
-        ctx.fillText(msg, 4.5*size, 4.5*size);
+        ctx.fillText(this.msg, 4.5*size, 4.5*size);
     }
 
     this.renderClock(0, 0, 130,
@@ -114,15 +109,13 @@ ChessGame.prototype.render = function() {
 ChessGame.prototype.renderClock = function(x, y, size, t, color) {
     var ctx = this.clocks_ctx;
     var active = (this.color != 0) && ((this.turn & 1) == (color > 0 ? 1 : 0));
-    ctx.fillStyle = "#cfcfd1";
-    ctx.beginPath();
-    ctx.arc(x+0.5*size, y+0.5*size, 0.5*size, 0, Math.PI*2, true);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = "#ffffff";
+    ctx.strokeStyle = "#cfcfd1";
+    ctx.fillStyle = "#fafafa";
+    ctx.lineWidth = 12;
     ctx.beginPath();
     ctx.arc(x+0.5*size, y+0.5*size, 0.45*size, 0, Math.PI*2, true);
     ctx.closePath();
+    ctx.stroke();
     ctx.fill();
 
     ctx.fillStyle = "#888";
@@ -200,12 +193,19 @@ ChessGame.prototype.process = function(e) {
         this.render();
     }
     else if (msg.Cmd == "start") {
-        this.board = msg.Board;
+        this.board = [+3,+5,+4,+2,+1,+4,+5,+3,+6,+6,+6,+6,+6,+6,+6,+6,
+            0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+            -6,-6,-6,-6,-6,-6,-6,-6,-3,-5,-4,-2,-1,-4,-5,-3];
         this.color = msg.Color;
         this.turn = 1;
+        this.msg = null;
         this.totalTime = msg.RemainingA;
         this.remainingA = msg.RemainingA;
         this.remainingB = msg.RemainingB;
+        this.render();
+    }
+    else if (msg.Cmd == "msg") {
+        this.msg = msg.Text;
         this.render();
     }
     else if (msg.Cmd == "ping") {
