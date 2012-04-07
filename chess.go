@@ -88,8 +88,8 @@ func (g *Game) Move(ax, ay, bx, by int) bool {
 }
 
 func (g *Game) formatMove(ax, ay, bx, by int) string {
-    buf := []byte{"?NBRQK?KQRBN?"[g.board[ay][ax]+6], byte('a' + ay),
-        byte('0' + ax), '-', byte('a' + by), byte('0' + ax)}
+    buf := []byte{"?NBRQK?KQRBN?"[g.board[ay][ax]+6], byte('a' + ax),
+        byte('1' + ay), '-', byte('a' + bx), byte('1' + by)}
     if g.board[by][bx] != EMPTY {
         buf[3] = 'x'
     }
