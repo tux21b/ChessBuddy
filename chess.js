@@ -109,7 +109,8 @@ ChessGame.prototype.render = function() {
 ChessGame.prototype.renderClock = function(x, y, size, t, color) {
     var ctx = this.clocks_ctx;
     var active = (this.color != 0) && ((this.turn & 1) == (color > 0 ? 1 : 0));
-    ctx.strokeStyle = "#cfcfd1";
+
+    ctx.strokeStyle = "#cacad1";
     ctx.fillStyle = "#fafafa";
     ctx.lineWidth = 12;
     ctx.beginPath();
@@ -118,25 +119,32 @@ ChessGame.prototype.renderClock = function(x, y, size, t, color) {
     ctx.stroke();
     ctx.fill();
 
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.beginPath();
+    ctx.arc(x+0.5*size, y+0.5*size, 0.4*size, 0, Math.PI, true);
+    ctx.arc(x+0.5*size, y+0.5*size, 0.1*size, Math.PI, 0, false);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalCompositeOperation = "source-over";
+
+    /* draw label */
     ctx.fillStyle = "#888";
     ctx.font = 'bold 12pt "Helvetica Neue", Helvetica, Arial, sans-serif';
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(color > 0 ? "white" : "black", x+0.5*size, y+0.7*size);
 
-    ctx.fillStyle = active ? "#ff0000" : "#000000";
+    /* draw pointer */
+    ctx.fillStyle = active ? "#ee0000" : "#222";
+    ctx.strokeStyle = active ? "#ee0000" : "#222";
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(x+0.5*size, y+0.5*size, 0.05*size, 0, Math.PI*2, true);
-    ctx.closePath();
-    ctx.fill();
-
-    ctx.strokeStyle = active ? "#ff0000" : "#000000";
-    ctx.lineWidth = 8;
-    ctx.beginPath();
-    ctx.moveTo(x+0.5*size, y+0.5*size);
+    ctx.arc(x+0.5*size, y+0.5*size, 0.04*size,
+        t*2*Math.PI-0.3*Math.PI, t*2*Math.PI-0.7*Math.PI, false);
     ctx.lineTo(x+0.5*size+0.475*size*Math.sin(t*2*Math.PI),
         y+0.5*size-0.475*size*Math.cos(t*2*Math.PI));
     ctx.closePath();
+    ctx.fill();
     ctx.stroke();
 }
 
