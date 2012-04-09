@@ -15,6 +15,7 @@ function ChessGame(canvas, clocks, websocket) {
     this.clocks_ctx = clocks.getContext("2d");
     this.color = 0;
     this.turn = 0;
+    this.white = true;
     this.board = [];
     this.sel = null;
     for (var i = 0; i < 64; i++)
@@ -107,15 +108,15 @@ ChessGame.prototype.render = function() {
     }
 
     this.renderClock(0, 0, 130,
-        this.totalTime > 0 ? this.remainingA / this.totalTime : 0, 1);
+        this.totalTime > 0 ? this.remainingA / this.totalTime : 0, true);
     this.renderClock(150, 0, 130,
-        this.totalTime > 0 ? this.remainingB / this.totalTime : 0, -1);
+        this.totalTime > 0 ? this.remainingB / this.totalTime : 0, false);
 };
 
 
-ChessGame.prototype.renderClock = function(x, y, size, t, color) {
+ChessGame.prototype.renderClock = function(x, y, size, t, white) {
     var ctx = this.clocks_ctx;
-    var active = (this.color != 0) && ((this.turn & 1) == (color > 0 ? 1 : 0));
+    var active = (this.white == white);
 
     ctx.strokeStyle = "#cacad1";
     ctx.fillStyle = "#fafafa";
@@ -139,7 +140,7 @@ ChessGame.prototype.renderClock = function(x, y, size, t, color) {
     ctx.font = 'bold 12pt "Helvetica Neue", Helvetica, Arial, sans-serif';
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(color > 0 ? "white" : "black", x+0.5*size, y+0.7*size);
+    ctx.fillText(white ? "white" : "black", x+0.5*size, y+0.7*size);
 
     /* draw pointer */
     ctx.fillStyle = active ? "#ee0000" : "#222";
@@ -188,7 +189,8 @@ ChessGame.prototype.click = function(e) {
         this.sel = {x: x, y: y};
     } else if (this.sel != null) {
         ws.send(JSON.stringify({Cmd: "move", Turn: this.turn,
-            ax: this.sel.x, ay: this.sel.y, bx: x, by: y}));
+            ax: this.sel.x, ay: this.sel.y, bx: x, by: y,
+            White: this.color > 0}));
         this.sel = null;
     }
     this.render();
@@ -201,7 +203,11 @@ ChessGame.prototype.process = function(e) {
     if (msg.Cmd == "move") {
         this.board[msg.By*8+msg.Bx] = this.board[msg.Ay*8+msg.Ax];
         this.board[msg.Ay*8+msg.Ax] = 0;
-        this.turn = msg.Turn+1;
+        this.turn = msg.Turn;
+        this.white = !msg.White;
+        if (this.white) {
+            this.turn++;
+        }
         this.remainingA = msg.RemainingA;
         this.remainingB = msg.RemainingB;
         document.getElementById("history").innerHTML += msg.History + " ";
@@ -211,7 +217,8 @@ ChessGame.prototype.process = function(e) {
         this.board = [+3,+5,+4,+2,+1,+4,+5,+3,+6,+6,+6,+6,+6,+6,+6,+6,
             0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
             -6,-6,-6,-6,-6,-6,-6,-6,-3,-5,-4,-2,-1,-4,-5,-3];
-        this.color = msg.Color;
+        this.color = msg.White ? 1 : -1;
+        this.white = true;
         this.turn = 1;
         this.msg = null;
         this.totalTime = msg.RemainingA;
@@ -231,7 +238,7 @@ ChessGame.prototype.process = function(e) {
 
 ChessGame.prototype.tick = function() {
     if (!this.msg) {
-        if ((this.turn % 2) == 1) {
+        if (this.white) {
             this.remainingA -= 1000000000;
             if (this.remainingA < 0)
                 this.remainingA = 0;
@@ -241,8 +248,10 @@ ChessGame.prototype.tick = function() {
                 this.remainingB = 0;
         }
     }
+
+
     this.renderClock(0, 0, 130,
-        this.totalTime > 0 ? this.remainingA / this.totalTime : 0, 1);
+        this.totalTime > 0 ? this.remainingA / this.totalTime : 0, true);
     this.renderClock(150, 0, 130,
-        this.totalTime > 0 ? this.remainingB / this.totalTime : 0, -1);
+        this.totalTime > 0 ? this.remainingB / this.totalTime : 0, false);
 }

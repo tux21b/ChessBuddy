@@ -25,7 +25,7 @@ type Message struct {
     Turn                   int
     Ax, Ay                 int
     Bx, By                 int
-    Color                  int
+    White                  bool
     NumPlayers             int32
     History                string
     RemainingA, RemainingB time.Duration
@@ -34,7 +34,7 @@ type Message struct {
 
 type Player struct {
     Conn      *websocket.Conn
-    Color     int
+    White     bool
     Remaining time.Duration
     Out       chan<- Message
 }
@@ -53,12 +53,10 @@ func (p Player) Alive() bool {
 }
 
 func (p Player) String() string {
-    if p.Color == WHITE {
+    if p.White {
         return "White"
-    } else if p.Color == BLACK {
-        return "Black"
     }
-    return "Unknown"
+    return "Black"
 }
 
 // Available Players which are currently looking for a taff opponent.
@@ -90,19 +88,18 @@ func play(a, b Player) {
 
     log.Println("Starting new game")
 
-    game := NewGame()
+    board := NewBoard()
     if rand.Float32() > 0.5 {
         a, b = b, a
     }
-    a.Color = WHITE
-    b.Color = BLACK
+    a.White = true
     a.Remaining = *timeLimit
     b.Remaining = *timeLimit
 
-    a.Out <- Message{Cmd: "start", Color: a.Color, Turn: game.Turn(),
+    a.Out <- Message{Cmd: "start", White: a.White, Turn: board.Turn(),
         NumPlayers: atomic.LoadInt32(&numPlayers),
         RemainingA: a.Remaining, RemainingB: b.Remaining}
-    b.Out <- Message{Cmd: "start", Color: b.Color, Turn: game.Turn(),
+    b.Out <- Message{Cmd: "start", White: b.White, Turn: board.Turn(),
         NumPlayers: atomic.LoadInt32(&numPlayers),
         RemainingA: a.Remaining, RemainingB: b.Remaining}
 
@@ -129,13 +126,14 @@ func play(a, b Player) {
             }
             break
         }
-        if msg.Cmd == "move" && msg.Turn == game.Turn()+1 &&
-            game.Move(msg.Ax, msg.Ay, msg.Bx, msg.By) {
+        if msg.Cmd == "move" && msg.Turn == board.Turn() &&
+            msg.White == board.White() &&
+            board.Move(msg.Ax, msg.Ay, msg.Bx, msg.By) {
 
-            msg.History = game.History()[len(game.History())-1]
+            msg.History = board.LastMove()
             msg.NumPlayers = atomic.LoadInt32(&numPlayers)
-            if game.Turn()&1 == 1 {
-                msg.History = fmt.Sprintf("%d. %s", (game.Turn()+1)/2, msg.History)
+            if !board.White() {
+                msg.History = fmt.Sprintf("%d. %s", board.Turn(), msg.History)
             }
             now := time.Now()
             a.Remaining -= now.Sub(start)
@@ -144,7 +142,7 @@ func play(a, b Player) {
             }
             start = now
             msg.RemainingA, msg.RemainingB = a.Remaining, b.Remaining
-            if a.Color == BLACK {
+            if !a.White {
                 msg.RemainingA, msg.RemainingB = b.Remaining, a.Remaining
             }
             a, b = b, a
