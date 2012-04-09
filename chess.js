@@ -187,7 +187,7 @@ ChessGame.prototype.click = function(e) {
         this.sel = null;
     } else if (this.board[y*8+x]*this.color > 0) {
         this.sel = {x: x, y: y};
-    } else if (this.sel != null) {
+    } else if (this.sel != null && this.white == (this.color > 0)) {
         ws.send(JSON.stringify({Cmd: "move", Turn: this.turn,
             ax: this.sel.x, ay: this.sel.y, bx: x, by: y,
             White: this.color > 0}));
