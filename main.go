@@ -9,11 +9,13 @@ import (
     "code.google.com/p/go.net/websocket"
     "flag"
     "fmt"
+    "go/build"
     "html/template"
     "log"
     "math/rand"
     "net"
     "net/http"
+    "path/filepath"
     "sync/atomic"
     "time"
 )
@@ -149,8 +151,6 @@ func play(a, b Player) {
     }
 }
 
-var tmpl = template.Must(template.ParseFiles("chess.html"))
-
 // Serve the index page.
 func handleIndex(w http.ResponseWriter, r *http.Request) {
     if r.URL.Path != "/" {
@@ -164,6 +164,7 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 
 // Serve a static file (e.g. style sheets, scripts or images).
 func handleFile(path string) http.HandlerFunc {
+    path = filepath.Join(root, path)
     return func(w http.ResponseWriter, r *http.Request) {
         http.ServeFile(w, r, path)
     }
@@ -194,6 +195,11 @@ func handleWS(ws *websocket.Conn) {
     }
 }
 
+const basePkg = "github.com/tux21b/ChessBuddy"
+
+var tmpl *template.Template
+var root string = "."
+
 var timeLimit *time.Duration = flag.Duration("time", 5*time.Minute,
     "time limit per side (sudden death, no add)")
 var listenAddr *string = flag.String("http", ":8000",
@@ -201,6 +207,19 @@ var listenAddr *string = flag.String("http", ":8000",
 
 func main() {
     flag.Parse()
+
+    p, err := build.Default.Import(basePkg, "", build.FindOnly)
+    if err != nil {
+        log.Fatalf("Couldn't find ChessBuddy files: %v", err)
+    }
+    root = p.Dir
+
+    tmpl, err = template.ParseFiles(filepath.Join(root, "chess.html"))
+    if err != nil {
+        log.Fatalf("Couldn't parse chess.html: %v", err)
+    }
+
+    template.Must(template.ParseFiles("chess.html"))
 
     http.HandleFunc("/", handleIndex)
     http.HandleFunc("/chess.js", handleFile("chess.js"))
