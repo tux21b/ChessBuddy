@@ -19,9 +19,7 @@ visitors around.
 Missing Features
 ----------------
 
-* detect "stalemate", "check" and "checkmate"
-* castling, en passant and promotion
-* chess clock
+* en passant and promotion
 * invite a specific person by sharing a custom URL
 
 Authors
