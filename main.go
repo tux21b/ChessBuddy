@@ -219,8 +219,6 @@ func main() {
         log.Fatalf("Couldn't parse chess.html: %v", err)
     }
 
-    template.Must(template.ParseFiles("chess.html"))
-
     http.HandleFunc("/", handleIndex)
     http.HandleFunc("/chess.js", handleFile("chess.js"))
     http.HandleFunc("/chess.css", handleFile("chess.css"))
