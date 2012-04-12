@@ -1,65 +1,49 @@
 package main
 
 import (
+    "strings"
     "testing"
 )
 
-func mv(t *testing.T, b *Board, ax, ay, bx, by int, log string) {
-    if !b.Move(ax, ay, bx, by) && log != "" {
-        t.Errorf("the move from (%d,%d) to (%d,%d) failed.", ax, ay, bx, by)
-        return
-    }
-    if b.LastMove() != log {
-        t.Errorf("invalid log entry. expected %q, got %q", log, b.LastMove())
-        return
+func testGame(t *testing.T, text string) {
+    b := NewBoard()
+    for i, mv := range strings.Fields(text) {
+        if i%3 == 0 {
+            continue // skip turn numbers
+        }
+        prev := *b
+        if !b.MoveSAN(mv) {
+            t.Fatalf("the move %q failed. board=%q", mv, b)
+        }
+        mv = strings.Trim(mv, "!?")
+        if log := b.LastMove(); log != mv {
+            t.Errorf("unexpected log entry. want=%q, got=%q, board=%q",
+                mv, log, &prev)
+        }
     }
 }
 
 func TestFoolsMate(t *testing.T) {
-    b := NewBoard()
-    mv(t, b, 5, 1, 5, 2, "f2-f3")
-    mv(t, b, 4, 6, 4, 5, "e7-e6")
-    mv(t, b, 6, 1, 6, 3, "g2-g4")
-    mv(t, b, 3, 7, 7, 3, "Qd8-h4#")
+    testGame(t, "1. e4 g5 2. d4 f6 3. Qh5#")
 }
 
-// a=0  b=1  c=2  d=3  e=4  f=5  g=6  h=7
 func TestImmortalLosingGame(t *testing.T) {
-    b := NewBoard()
-    mv(t, b, 3, 1, 3, 3, "d2-d4")
-    mv(t, b, 5, 6, 5, 4, "f7-f5")
-    mv(t, b, 6, 1, 6, 2, "g2-g3")
-    mv(t, b, 6, 6, 6, 5, "g7-g6")
-    mv(t, b, 5, 0, 6, 1, "Bf1-g2")
-    mv(t, b, 5, 7, 6, 6, "Bf8-g7")
-    mv(t, b, 1, 0, 2, 2, "Nb1-c3")
-    mv(t, b, 6, 7, 5, 5, "Ng8-f6")
-    mv(t, b, 2, 0, 6, 4, "Bc1-g5")
-    mv(t, b, 1, 7, 2, 5, "Nb8-c6")
-    mv(t, b, 3, 0, 3, 1, "Qd1-d2")
-    mv(t, b, 3, 6, 3, 5, "d7-d6")
-    mv(t, b, 7, 1, 7, 3, "h2-h4")
-    mv(t, b, 4, 6, 4, 5, "e7-e6")
-    // 8. 0-0-0 h6
-    // 9. Bf4 Bd7
-    // 10. e4 fxe4
-    // 11. Nxe4 Nd5
-    // 12. Ne2 Qe7
-    // 13. c4 Nb6?
-    // 14. c5! dxc5
-    // 15. Bxc7! 0-0
-    // 16. Bd6 Qf7
-    // 17. Bxf8 Rxf8
-    // 18. dxc5 Nd5
-    // 19. f4 Rd8
-    // 20. N2c3 Ndb4
-    // 21. Nd6 Qf8
-    // 22. Nxb7 Nd4!
-    // 23. Nxd8 Bb5!
-    // 24. Nxe6! Bd3!
-    // 25. Bd5! Qf5!
-    // 26. Nxd4+ Qxd5!
-    // 27. Nc2! Bxc3
-    // 28. bxc3! Qxa2 29. cxb4!
-    // 29. Nxb4 Qb1#
+    testGame(t, `1. d4 f5 2. g3 g6 3. Bg2 Bg7 4. Nc3 Nf6 5. Bg5 Nc6 6. Qd2 d6
+        7. h4 e6 8. 0-0-0 h6 9. Bf4 Bd7 10. e4 fxe4 11. Nxe4 Nd5 12. Ne2 Qe7
+        13. c4 Nb6? 14. c5! dxc5 15. Bxc7! 0-0 16. Bd6 Qf7 17. Bxf8 Rxf8
+        18. dxc5 Nd5 19. f4 Rd8 20. N2c3 Ndb4 21. Nd6 Qf8 22. Nxb7 Nd4!
+        23. Nxd8 Bb5! 24. Nxe6! Bd3! 25. Bd5! Qf5! 26. Nxd4+ Qxd5!
+        27. Nc2! Bxc3 28. bxc3! Qxa2 29. cxb4!`)
+}
+
+func TestKasparovsImmortal(t *testing.T) {
+    testGame(t, `1. e4 d6 2. d4 Nf6 3. Nc3 g6 4. Be3 Bg7 5. Qd2 c6 6. f3 b5
+        7. Nge2 Nbd7 8. Bh6 Bxh6 9. Qxh6 Bb7 10. a3 e5 11. 0-0-0 Qe7
+        12. Kb1 a6 13. Nc1 0-0-0 14. Nb3 exd4 15. Rxd4 c5 16. Rd1 Nb6
+        17. g3 Kb8 18. Na5 Ba8 19. Bh3 d5 20. Qf4+ Ka7 21. Rhe1 d4
+        22. Nd5 Nbxd5 23. exd5 Qd6 24. Rxd4 cxd4 25. Re7+ Kb6
+        26. Qxd4+ Kxa5 27. b4+ Ka4 28. Qc3 Qxd5 29. Ra7 Bb7 30. Rxb7
+        Qc4 31. Qxf6 Kxa3 32. Qxa6+ Kxb4 33. c3+ Kxc3 34. Qa1+ Kd2
+        35. Qb2+ Kd1 36. Bf1 Rd2 37. Rd7 Rxd7 38. Bxc4 bxc4 39. Qxh8
+        Rd3 40. Qa8 c3 41. Qa4+ Ke1 42. f4 f5 43. Kc1 Rd2 44. Qa7`)
 }

@@ -203,6 +203,24 @@ ChessGame.prototype.process = function(e) {
     if (msg.Cmd == "move") {
         this.board[msg.By*8+msg.Bx] = this.board[msg.Ay*8+msg.Ax];
         this.board[msg.Ay*8+msg.Ax] = 0;
+        console.log(msg.History, msg.White)
+        if (msg.History == "0-0") {
+            if (msg.White) {
+                this.board[5] = this.board[7];
+                this.board[7] = 0;
+            } else {
+                this.board[61] = this.board[63];
+                this.board[63] = 0;
+            }
+        } else if (msg.History == "0-0-0") {
+            if (msg.White) {
+                this.board[3] = this.board[0];
+                this.board[0] = 0;
+            } else {
+                this.board[59] = this.board[56];
+                this.board[56] = 0;
+            }
+        }
         this.turn = msg.Turn;
         this.white = !msg.White;
         if (this.white) {
@@ -210,7 +228,13 @@ ChessGame.prototype.process = function(e) {
         }
         this.remainingA = msg.RemainingA;
         this.remainingB = msg.RemainingB;
-        document.getElementById("history").innerHTML += msg.History + " ";
+        if (msg.White) {
+            document.getElementById("history").innerHTML +=
+                msg.Turn + ".&nbsp;" + msg.History + "&nbsp;";
+        } else {
+            document.getElementById("history").innerHTML +=
+                msg.History + " ";
+        }
         this.render();
     }
     else if (msg.Cmd == "start") {

@@ -132,9 +132,6 @@ func play(a, b Player) {
 
             msg.History = board.LastMove()
             msg.NumPlayers = atomic.LoadInt32(&numPlayers)
-            if !board.White() {
-                msg.History = fmt.Sprintf("%d. %s", board.Turn(), msg.History)
-            }
             now := time.Now()
             a.Remaining -= now.Sub(start)
             if a.Remaining <= 10*time.Millisecond {
