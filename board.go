@@ -11,8 +11,6 @@ import (
     "strings"
 )
 
-type piece int8
-
 type pos int
 
 func Pos(file, rank int) pos {
@@ -26,23 +24,25 @@ func (p pos) String() string {
     return fmt.Sprintf("%c%c", 'a'+p&7, '1'+p>>4)
 }
 
+type piece int8
+
 // black pieces have the 4th bit set (mask 0x8)
 // sliding pieces have the 3rd bit set (mask 0x4)
 // orthogonal movement
 const (
-    Empty       piece = 0x0
-    WhitePawn   piece = 0x1
-    WhiteKnight piece = 0x2
-    WhiteKing   piece = 0x3
-    WhiteBishop piece = 0x5
-    WhiteRook   piece = 0x6
-    WhiteQueen  piece = 0x7
-    BlackPawn   piece = 0x9
-    BlackKnight piece = 0xA
-    BlackKing   piece = 0xB
-    BlackBishop piece = 0xD
-    BlackRook   piece = 0xE
-    BlackQueen  piece = 0xF
+    Pw piece = 0x1
+    Nw piece = 0x2
+    Kw piece = 0x3
+    Bw piece = 0x5
+    Rw piece = 0x6
+    Qw piece = 0x7
+
+    Pb piece = 0x9
+    Nb piece = 0xA
+    Kb piece = 0xB
+    Bb piece = 0xD
+    Rb piece = 0xE
+    Qb piece = 0xF
 )
 
 const (
@@ -50,10 +50,10 @@ const (
     StalemateFlag = 0x02
     CheckmateFlag = 0x03
     BlackFlag     = 0x08
-    castleKW      = 0x10
-    castleQW      = 0x20
-    castleKB      = 0x40
-    castleQB      = 0x80
+    castleKw      = 0x10
+    castleQw      = 0x20
+    castleKb      = 0x40
+    castleQb      = 0x80
 )
 
 // Board stores and maintains a full chess position. In addition to the
@@ -79,28 +79,16 @@ type Board struct {
 func NewBoard() *Board {
     return &Board{
         board: [128]piece{
-            WhiteRook, WhiteKnight, WhiteBishop, WhiteQueen,
-            WhiteKing, WhiteBishop, WhiteKnight, WhiteRook,
-            Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-            WhitePawn, WhitePawn, WhitePawn, WhitePawn,
-            WhitePawn, WhitePawn, WhitePawn, WhitePawn,
-            Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-            Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-            Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-            Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-            Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-            Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-            Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-            Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-            Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-            BlackPawn, BlackPawn, BlackPawn, BlackPawn,
-            BlackPawn, BlackPawn, BlackPawn, BlackPawn,
-            Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
-            BlackRook, BlackKnight, BlackBishop, BlackQueen,
-            BlackKing, BlackBishop, BlackKnight, BlackRook,
-            Empty, Empty, Empty, Empty, Empty, Empty, Empty, Empty,
+            Rw, Nw, Bw, Qw, Kw, Bw, Nw, Rw, 0, 0, 0, 0, 0, 0, 0, 0,
+            Pw, Pw, Pw, Pw, Pw, Pw, Pw, Pw, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            Pb, Pb, Pb, Pb, Pb, Pb, Pb, Pb, 0, 0, 0, 0, 0, 0, 0, 0,
+            Rb, Nb, Bb, Qb, Kb, Bb, Nb, Rb, 0, 0, 0, 0, 0, 0, 0, 0,
         },
-        status: castleKB | castleKW | castleQB | castleQW,
+        status: castleKb | castleKw | castleQb | castleQw,
     }
 }
 
@@ -108,9 +96,9 @@ func NewBoard() *Board {
 // position using FEN (Forsythe-Edwards Notation).
 func (t *Board) String() string {
     buf := &bytes.Buffer{}
-    for r := pos(0x70); r >= 0; r -= 16 {
+    for rank := pos(0x70); rank >= 0; rank -= 0x10 {
         empty := 0
-        for p := r; p&0x88 == 0; p++ {
+        for p := rank; p&0x88 == 0; p++ {
             if t.board[p] != 0 && empty > 0 {
                 buf.WriteByte(byte('0' + empty))
                 empty = 0
@@ -124,32 +112,28 @@ func (t *Board) String() string {
         if empty > 0 {
             buf.WriteByte(byte('0' + empty))
         }
-        if r != 0 {
+        if rank != 0 {
             buf.WriteByte('/')
         }
     }
-
     if t.status&BlackFlag == 0 {
         buf.WriteString(" w ")
     } else {
         buf.WriteString(" b ")
     }
-
     switch {
-    case t.status&castleKW != 0:
+    case t.status&castleKw != 0:
         buf.WriteByte('K')
-    case t.status&castleQW != 0:
+    case t.status&castleQw != 0:
         buf.WriteByte('Q')
-    case t.status&castleKB != 0:
+    case t.status&castleKb != 0:
         buf.WriteByte('k')
-    case t.status&castleQB != 0:
+    case t.status&castleQb != 0:
         buf.WriteByte('q')
     default:
         buf.WriteByte('-')
     }
-
     fmt.Fprintf(buf, " %d %d", len(t.hist), t.Turn())
-
     return buf.String()
 }
 
@@ -186,30 +170,41 @@ func (b *Board) LastMove() string {
 func (t *Board) move(a, b pos, exec, check bool) (valid bool) {
     // only move existing pieces and do not capture own pieces
     piece, victim := t.board[a], t.board[b]
-    if piece == Empty || (t.status&BlackFlag != int(piece&BlackFlag)) ||
-        (victim != Empty && piece&BlackFlag == victim&BlackFlag) {
+    if piece == 0 || (t.status&BlackFlag != int(piece&BlackFlag)) ||
+        (victim != 0 && piece&BlackFlag == victim&BlackFlag) {
         return false
+    }
+
+    // copy the current board state and revert any changes if the move
+    // turned out to be invalid or shouldn't have been executed
+    if exec || check {
+        backup := *t
+        defer func() {
+            if !valid || !exec {
+                *t = backup
+            }
+        }()
     }
 
     log := ""
     d, d2 := int(b-a), int((b-a)*(b-a))
     switch {
     // white pawns
-    case piece == WhitePawn && ((d == 16 && victim == 0) ||
+    case piece == Pw && ((d == 16 && victim == 0) ||
         (a>>4 == 1 && d == 32 && victim == 0) ||
         (victim != 0 && (d == 15 || d == 17))):
 
     // black pawns
-    case piece == BlackPawn && ((d == -16 && victim == 0) ||
+    case piece == Pb && ((d == -16 && victim == 0) ||
         (a>>4 == 6 && d == -32 && victim == 0) ||
         (victim != 0 && (d == -15 || d == -17))):
 
     // kings
-    case piece&0x7 == WhiteKing && (d2 == 1 || (d2 >= 15*15 && d2 <= 17*17)):
+    case piece&0x7 == Kw && (d2 == 1 || (d2 >= 15*15 && d2 <= 17*17)):
 
     // knights
-    case piece&0x7 == WhiteKnight && (d2 == 18*18 || d2 == 14*14 ||
-        d2 == 31*31 || d2 == 33*33):
+    case piece&0x7 == Nw && (d2 == 18*18 || d2 == 14*14 || d2 == 31*31 ||
+        d2 == 33*33):
 
     // orthogonal sliding pieces (rooks and queens)
     case piece&0x6 == 0x6 && (a>>4 == b>>4 || a&7 == b&7) &&
@@ -222,59 +217,44 @@ func (t *Board) move(a, b pos, exec, check bool) (valid bool) {
             t.slide(a, b, -17)):
 
     // castling rules
-    case piece == WhiteKing && a == 4 && b == 2 &&
-        t.status&castleQW > 0 && t.status&CheckFlag == 0 && t.slide(4, 0, -1):
+    case piece == Kw && a == 0x04 && b == 0x02 && t.status&castleQw > 0 &&
+        t.status&CheckFlag == 0 && t.slide(0x04, 0x00, -1):
         if exec {
             log = "0-0-0"
-            t.board[3], t.board[0] = WhiteRook, 0
+            t.board[0x03], t.board[0x00] = Rw, 0
         }
-    case piece == WhiteKing && a == 4 && b == 6 &&
-        t.status&castleKW > 0 && t.status&CheckFlag == 0 && t.slide(4, 7, 1):
+    case piece == Kw && a == 0x04 && b == 0x06 && t.status&castleKw > 0 &&
+        t.status&CheckFlag == 0 && t.slide(0x04, 0x07, 1):
         if exec {
             log = "0-0"
-            t.board[5], t.board[7] = WhiteRook, 0
+            t.board[0x05], t.board[0x07] = Rw, 0
         }
-    case piece == BlackKing && a == 116 && b == 114 &&
-        t.status&castleQB > 0 && t.status&CheckFlag == 0 &&
-        t.slide(116, 112, -1):
+    case piece == Kb && a == 0x74 && b == 0x72 && t.status&castleQb > 0 &&
+        t.status&CheckFlag == 0 && t.slide(0x74, 0x70, -1):
         if exec {
+            t.board[0x73], t.board[0x70] = Rb, 0
             log = "0-0-0"
-            t.board[115], t.board[112] = BlackRook, 0
         }
-    case piece == BlackKing && a == 116 && b == 118 &&
-        t.status&castleKB > 0 && t.status&CheckFlag == 0 &&
-        t.slide(116, 119, 1):
+    case piece == Kb && a == 0x74 && b == 118 && t.status&castleKb > 0 &&
+        t.status&CheckFlag == 0 && t.slide(0x74, 0x77, 1):
         if exec {
             log = "0-0"
-            t.board[117], t.board[119] = BlackRook, 0
+            t.board[0x75], t.board[0x77] = Rb, 0
         }
 
     default:
         return false
     }
 
-    if !(exec || check) {
-        return true
-    }
-
     if exec && log == "" {
         log = t.formatMove(a, b)
     }
-
-    // copy the current board state and revert any changes if the move
-    // turned out to be invalid or shouldn't have been executed
-    backup := *t
-    defer func() {
-        if !valid || !exec {
-            *t = backup
+    if check || exec {
+        t.board[b], t.board[a] = t.board[a], 0
+        if check && t.check() {
+            return false
         }
-    }()
 
-    // apply the move
-    t.board[b], t.board[a] = t.board[a], 0
-
-    if check && t.check() {
-        return false
     }
 
     if exec {
@@ -282,18 +262,18 @@ func (t *Board) move(a, b pos, exec, check bool) (valid bool) {
         t.status &^= CheckFlag | StalemateFlag
 
         switch a {
-        case 0:
-            t.status &^= castleQW
-        case 4:
-            t.status &^= castleQW | castleKW
-        case 7:
-            t.status &^= castleKW
-        case 112:
-            t.status &^= castleQB
-        case 116:
-            t.status &^= castleQB | castleKB
-        case 119:
-            t.status &^= castleKB
+        case 0x00:
+            t.status &^= castleQw
+        case 0x04:
+            t.status &^= castleQw | castleKw
+        case 0x07:
+            t.status &^= castleKw
+        case 0x70:
+            t.status &^= castleQb
+        case 0x74:
+            t.status &^= castleQb | castleKb
+        case 0x77:
+            t.status &^= castleKb
         }
 
         if t.check() {
@@ -314,7 +294,7 @@ func (b *Board) slide(from, to, pattern pos) bool {
     for p := from + pattern; p&0x88 == 0; p += pattern {
         if p == to {
             return true
-        } else if b.board[p] != Empty {
+        } else if b.board[p] != 0 {
             break
         }
     }
@@ -324,7 +304,7 @@ func (b *Board) slide(from, to, pattern pos) bool {
 func (b *Board) check() bool {
     end := pos(0)
     for p := pos(0); p < 128; p++ {
-        if b.board[p] == WhiteKing|piece(b.status&BlackFlag) {
+        if b.board[p] == Kw|piece(b.status&BlackFlag) {
             end = p
             break
         }
@@ -356,17 +336,8 @@ func (b *Board) stalemate() bool {
 
 func (t *Board) formatMove(a, b pos) string {
     buf := &bytes.Buffer{}
-    switch t.board[a] & 0x7 {
-    case WhiteRook:
-        buf.WriteByte('R')
-    case WhiteKnight:
-        buf.WriteByte('N')
-    case WhiteBishop:
-        buf.WriteByte('B')
-    case WhiteQueen:
-        buf.WriteByte('Q')
-    case WhiteKing:
-        buf.WriteByte('K')
+    if t.board[a]&0x7 != Pw {
+        buf.WriteByte(" PNK?BRQ"[t.board[a]&0x7])
     }
 
     // check if the rank or file is ambigous
@@ -381,7 +352,7 @@ func (t *Board) formatMove(a, b pos) string {
         }
     }
     // pawn captures always include the file, even if not ambigous
-    if file || (t.board[a]&0x7 == WhitePawn && t.board[b] != 0) {
+    if file || (t.board[a]&0x7 == Pw && t.board[b] != 0) {
         buf.WriteByte('a' + byte(a&7))
     }
     if rank {
@@ -413,30 +384,30 @@ func (t *Board) MoveSAN(san string) bool {
     // handle special moves (castling)
     switch {
     case san == "0-0-0" && t.White():
-        return t.move(4, 2, true, true)
+        return t.move(0x04, 0x02, true, true)
     case san == "0-0-0" && !t.White():
-        return t.move(116, 114, true, true)
+        return t.move(0x74, 0x72, true, true)
     case san == "0-0" && t.White():
-        return t.move(4, 6, true, true)
+        return t.move(0x04, 0x06, true, true)
     case san == "0-0" && !t.White():
-        return t.move(116, 118, true, true)
+        return t.move(0x74, 0x76, true, true)
     }
 
     ax, ay := -1, -1
-    piece := WhitePawn
+    piece := Pw
 
     if len(san) > 0 && san[0] >= 'A' && san[0] <= 'Z' {
         switch san[0] {
         case 'K':
-            piece = WhiteKing
+            piece = Kw
         case 'Q':
-            piece = WhiteQueen
+            piece = Qw
         case 'B':
-            piece = WhiteBishop
+            piece = Bw
         case 'N':
-            piece = WhiteKnight
+            piece = Nw
         case 'R':
-            piece = WhiteRook
+            piece = Rw
         default:
             return false
         }
