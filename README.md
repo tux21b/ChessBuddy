@@ -3,7 +3,7 @@ ChessBuddy
 
 Play chess with [Go][1], HTML5, [WebSockets][2] and random strangers!
 
-* Demo: <http://www.tux21b.org:8000/>
+* Demo: <http://chess.tux21b.org/>
 
 Hint: Open the page in two different tabs, if there aren't any other
 visitors around.
