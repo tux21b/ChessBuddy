@@ -43,8 +43,7 @@ type Player struct {
 
 // Check wethever the player is still connected by sending a ping command.
 func (p Player) Alive() bool {
-    if err := websocket.JSON.Send(p.Conn, Message{Cmd: "ping",
-        NumPlayers: atomic.LoadInt32(&numPlayers)}); err != nil {
+    if err := websocket.JSON.Send(p.Conn, Message{Cmd: "ping"}); err != nil {
         return false
     }
     var msg Message
@@ -99,10 +98,8 @@ func play(a, b Player) {
     b.Remaining = *timeLimit
 
     a.Out <- Message{Cmd: "start", White: a.White, Turn: board.Turn(),
-        NumPlayers: atomic.LoadInt32(&numPlayers),
         RemainingA: a.Remaining, RemainingB: b.Remaining}
     b.Out <- Message{Cmd: "start", White: b.White, Turn: board.Turn(),
-        NumPlayers: atomic.LoadInt32(&numPlayers),
         RemainingA: a.Remaining, RemainingB: b.Remaining}
 
     start := time.Now()
@@ -133,7 +130,6 @@ func play(a, b Player) {
             board.Move(msg.Ax, msg.Ay, msg.Bx, msg.By) {
 
             msg.History = board.LastMove()
-            msg.NumPlayers = atomic.LoadInt32(&numPlayers)
             now := time.Now()
             a.Remaining -= now.Sub(start)
             if a.Remaining <= 10*time.Millisecond {
@@ -171,18 +167,39 @@ func handleFile(path string) http.HandlerFunc {
 }
 
 func handleWS(ws *websocket.Conn) {
-    count := atomic.AddInt32(&numPlayers, 1)
-    defer atomic.AddInt32(&numPlayers, -1)
-    defer ws.Close()
+    log.Println("Connected:", ws.Request().RemoteAddr)
+    atomic.AddInt32(&numPlayers, 1)
+    exitStat := make(chan bool, 1)
 
-    msg := Message{
-        Cmd:        "msg",
-        Text:       "Waiting for another player...",
-        NumPlayers: count,
-    }
-    if err := websocket.JSON.Send(ws, msg); err != nil {
-        return
-    }
+    defer func() {
+        exitStat <- true
+        atomic.AddInt32(&numPlayers, -1)
+        log.Println("Disconnected", ws.Request().RemoteAddr)
+        ws.Close()
+    }()
+
+    // Send statistics (i.e. player count) regularly. This will help to to
+    // detect disconnected players earlier and will prevent stupid proxies
+    // from closing inactive connections.
+    go func() {
+        ticker := time.NewTicker(20 * time.Second)
+        defer ticker.Stop()
+        msg := Message{Cmd: "stat"}
+        for {
+            msg.NumPlayers = atomic.LoadInt32(&numPlayers)
+            if err := websocket.JSON.Send(ws, msg); err != nil {
+                if err, ok := err.(net.Error); ok && !err.Temporary() {
+                    fmt.Println("network error")
+                }
+            }
+            select {
+            case <-ticker.C:
+                // continue
+            case <-exitStat:
+                return
+            }
+        }
+    }()
 
     out := make(chan Message, 1)
     available <- Player{Conn: ws, Out: out}

@@ -35,8 +35,7 @@
         <script type="text/javascript">
             var canvas = document.getElementById("board");
             var clocks = document.getElementById("clocks");
-            var ws = new WebSocket("ws://{{.}}/ws");
-            var chess = new ChessGame(canvas, clocks, ws);
+            var chess = new ChessGame(canvas, clocks, "ws://{{.}}/ws");
         </script>
 
         <footer>

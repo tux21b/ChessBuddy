@@ -8,7 +8,7 @@
 var SYMBOLS = ["♟", "♞", "♝", "♜", "♛", "♚", " ", "♔", "♕", "♖", "♗", "♘", "♙"];
 
 
-function ChessGame(canvas, clocks, websocket) {
+function ChessGame(canvas, clocks, addr) {
     this.canvas = canvas;
     this.canvas_ctx = canvas.getContext("2d");
     this.clocks = clocks;
@@ -20,22 +20,36 @@ function ChessGame(canvas, clocks, websocket) {
     this.sel = null;
     for (var i = 0; i < 64; i++)
         this.board[i] = 0;
-    this.ws = websocket;
     this.totalTime = 0;
     this.remainingA = 0;
     this.remainingB = 0;
     this.msg = null;
 
     var _this = this;
-    this.ws.onmessage = function(e) {
-        _this.process(e);
-    };
-    this.ws.onclose = function(e) {
-        if (!_this.msg) {
-            _this.msg = "Connection lost... Reload?";
+
+    if ('WebSocket' in window) {
+        this.ws = new WebSocket(addr);
+        this.ws.onopen = function(e) {
+            _this.msg = "Waiting for another player...";
+            _this.render();
         }
+        this.ws.onmessage = function(e) {
+            _this.process(e);
+        };
+        this.ws.onclose = function(e) {
+            if (!_this.msg) {
+                _this.msg = "Connection lost... Reload?";
+            }
+            _this.render();
+        };
+        this.ws.onerror = function(e) {
+            _this.msg = "Connection Error";
+            _this.render();
+        }
+    } else {
+        _this.msg = "Missing WebSocket Support";
         _this.render();
-    };
+    }
     this.canvas.addEventListener('click', function(e) {
         _this.click(e)
     });
@@ -188,7 +202,7 @@ ChessGame.prototype.click = function(e) {
     } else if (this.board[y*8+x]*this.color > 0) {
         this.sel = {x: x, y: y};
     } else if (this.sel != null && this.white == (this.color > 0)) {
-        ws.send(JSON.stringify({Cmd: "move", Turn: this.turn,
+        this.ws.send(JSON.stringify({Cmd: "move", Turn: this.turn,
             ax: this.sel.x, ay: this.sel.y, bx: x, by: y,
             White: this.color > 0}));
         this.sel = null;
@@ -203,7 +217,6 @@ ChessGame.prototype.process = function(e) {
     if (msg.Cmd == "move") {
         this.board[msg.By*8+msg.Bx] = this.board[msg.Ay*8+msg.Ax];
         this.board[msg.Ay*8+msg.Ax] = 0;
-        console.log(msg.History, msg.White)
         if (msg.History == "0-0") {
             if (msg.White) {
                 this.board[5] = this.board[7];
@@ -255,9 +268,11 @@ ChessGame.prototype.process = function(e) {
         this.render();
     }
     else if (msg.Cmd == "ping") {
-        ws.send(JSON.stringify({Cmd: "pong"}));
+        this.ws.send(JSON.stringify({Cmd: "pong"}));
     }
-    document.getElementById("numPlayers").innerHTML = msg.NumPlayers;
+    else if (msg.Cmd == "stat") {
+        document.getElementById("numPlayers").innerHTML = msg.NumPlayers;
+    }
 }
 
 ChessGame.prototype.tick = function() {
