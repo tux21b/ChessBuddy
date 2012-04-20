@@ -23,7 +23,7 @@ function ChessGame(canvas, clocks, addr) {
     this.totalTime = 0;
     this.remainingA = 0;
     this.remainingB = 0;
-    this.msg = null;
+    this.msg = "Connecting...";
 
     var _this = this;
 
