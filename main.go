@@ -2,7 +2,7 @@
 //
 // Copyright (c) 2012 by Christoph Hack <christoph@tux21b.org>
 // All rights reserved. Distributed under the Simplified BSD License.
-//
+
 package main
 
 import (
@@ -16,6 +16,7 @@ import (
     "net"
     "net/http"
     "path/filepath"
+    "runtime"
     "sync/atomic"
     "time"
 )
@@ -32,6 +33,7 @@ type Message struct {
     History                string
     RemainingA, RemainingB time.Duration
     Text                   string
+    Moves                  []pos
 }
 
 type Player struct {
@@ -42,7 +44,7 @@ type Player struct {
 }
 
 // Check wethever the player is still connected by sending a ping command.
-func (p Player) Alive() bool {
+func (p *Player) Alive() bool {
     if err := websocket.JSON.Send(p.Conn, Message{Cmd: "ping"}); err != nil {
         return false
     }
@@ -53,7 +55,7 @@ func (p Player) Alive() bool {
     return msg.Cmd == "pong"
 }
 
-func (p Player) String() string {
+func (p *Player) String() string {
     if p.White {
         return "White"
     }
@@ -61,7 +63,7 @@ func (p Player) String() string {
 }
 
 // Available Players which are currently looking for a taff opponent.
-var available = make(chan Player, 100)
+var available = make(chan *Player, 100)
 
 // Total number of connected players
 var numPlayers int32 = 0
@@ -81,7 +83,7 @@ func hookUp() {
     }
 }
 
-func play(a, b Player) {
+func play(a, b *Player) {
     defer func() {
         close(a.Out)
         close(b.Out)
@@ -143,6 +145,10 @@ func play(a, b Player) {
             a, b = b, a
             a.Out <- msg
             b.Out <- msg
+        } else if msg.Cmd == "select" && msg.Turn == board.Turn() &&
+            msg.White == board.White() {
+            msg.Moves = board.Moves(msg.Ax, msg.Ay)
+            a.Out <- msg
         }
     }
 }
@@ -188,8 +194,10 @@ func handleWS(ws *websocket.Conn) {
         for {
             msg.NumPlayers = atomic.LoadInt32(&numPlayers)
             if err := websocket.JSON.Send(ws, msg); err != nil {
-                if err, ok := err.(net.Error); ok && !err.Temporary() {
-                    fmt.Println("network error")
+                if nerr, ok := err.(net.Error); ok && !nerr.Temporary() {
+                    log.Printf("Network Error: %v", nerr)
+                    ws.Close()
+                    return
                 }
             }
             select {
@@ -201,9 +209,14 @@ func handleWS(ws *websocket.Conn) {
         }
     }()
 
+    // Add the player to the pool of available players so that he can get
+    // hooked up
     out := make(chan Message, 1)
-    available <- Player{Conn: ws, Out: out}
+    available <- &Player{Conn: ws, Out: out}
 
+    // Send the move commands from the game asynchronously, so that a slow
+    // internet connection can not be simulated to use up the opponents
+    // time limit.
     for msg := range out {
         if err := websocket.JSON.Send(ws, msg); err != nil {
             log.Printf("websocket.Send: %v", err)
@@ -224,6 +237,7 @@ var listenAddr *string = flag.String("http", ":8000",
 
 func main() {
     flag.Parse()
+    runtime.GOMAXPROCS(runtime.NumCPU())
 
     p, err := build.Default.Import(basePkg, "", build.FindOnly)
     if err != nil {
@@ -236,14 +250,14 @@ func main() {
         log.Fatalf("Couldn't parse chess.html: %v", err)
     }
 
+    go hookUp()
+
     http.HandleFunc("/", handleIndex)
     http.HandleFunc("/chess.js", handleFile("chess.js"))
     http.HandleFunc("/chess.css", handleFile("chess.css"))
     http.HandleFunc("/bg.png", handleFile("bg.png"))
     http.HandleFunc("/favicon.ico", handleFile("favicon.ico"))
     http.Handle("/ws", websocket.Handler(handleWS))
-
-    go hookUp()
 
     if err := http.ListenAndServe(*listenAddr, nil); err != nil {
         log.Fatalf("http.ListenAndServe: %v", err)

@@ -2,7 +2,7 @@
 //
 // Copyright (c) 2012 by Christoph Hack <christoph@tux21b.org>
 // All rights reserved. Distributed under the Simplified BSD License.
-//
+
 package main
 
 import (
@@ -456,4 +456,18 @@ func (t *Board) MoveSAN(san string) bool {
     }
 
     return t.move(a, b, true, true)
+}
+
+// Generate a list of all possible moves for the piece at (ax, bx).
+func (t *Board) Moves(ax, ay int) (moves []pos) {
+    if ax < 0 || ax > 7 || ay < 0 || ay > 7 {
+        return
+    }
+    src := Pos(ax, ay)
+    for dst := pos(0); dst < 128; dst++ {
+        if dst&0x88 == 0 && t.move(src, dst, false, true) {
+            moves = append(moves, dst)
+        }
+    }
+    return
 }

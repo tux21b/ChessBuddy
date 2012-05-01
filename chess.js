@@ -23,6 +23,7 @@ function ChessGame(canvas, clocks, addr) {
     this.totalTime = 0;
     this.remainingA = 0;
     this.remainingB = 0;
+    this.moves = [];
     this.msg = "Connecting...";
 
     var _this = this;
@@ -99,16 +100,36 @@ ChessGame.prototype.render = function() {
     }
 
     /* draw figures (incl. selection) */
-    ctx.font = '26pt "Helvetica Neue", Helvetica, Arial, sans-serif';
     for (var y = 0; y < 8; y++) {
         for (var x = 0; x < 8; x++) {
             ctx.fillStyle = "#000000";
+            ctx.font = '26pt "Helvetica Neue", Helvetica, Arial, sans-serif';
             var p = this.color > 0 ? (7-y)*8+x : y*8+7-x;
             if (this.sel != null && p == this.sel.y*8+this.sel.x) {
-                ctx.fillStyle = "#ff0000"
+                ctx.fillStyle = "#ff0000";
+                if (this.moves) {
+                    ctx.font = '30pt "Helvetica Neue", Helvetica, Arial, sans-serif';
+                }
             }
             ctx.fillText(SYMBOLS[this.board[p]+6],
                 border+(x+0.5)*size, border+(y+0.5)*size);
+        }
+    }
+
+    /* draw possible moves */
+    if (this.sel && this.moves) {
+        ctx.font = '26pt "Helvetica Neue", Helvetica, Arial, sans-serif';
+        for (var i = 0; i < this.moves.length; i++) {
+            ctx.fillStyle = "rgba(60, 60, 60, 0.2)";
+            var x = this.color > 0 ? this.moves[i]&7 : 7-(this.moves[i]&7);
+            var y = this.color > 0 ? 7-(this.moves[i]>>4) : this.moves[i]>>4;
+            var p = SYMBOLS[this.board[this.sel.y*8+this.sel.x]+6];
+            var f = this.color > 0 ? (7-y)*8+x : y*8+7-x;
+            if (this.board[f] != 0) {
+                ctx.fillStyle = "rgba(255, 0, 0, 0.6)";
+                p = "✘";
+            }
+            ctx.fillText(p, border+(x+0.5)*size, border+(y+0.5)*size);
         }
     }
 
@@ -201,6 +222,9 @@ ChessGame.prototype.click = function(e) {
         this.sel = null;
     } else if (this.board[y*8+x]*this.color > 0) {
         this.sel = {x: x, y: y};
+        this.moves = null;
+        this.ws.send(JSON.stringify({Cmd: "select", Turn: this.turn,
+            Ax: x, Ay: y, White: this.color > 0}));
     } else if (this.sel != null && this.white == (this.color > 0)) {
         this.ws.send(JSON.stringify({Cmd: "move", Turn: this.turn,
             ax: this.sel.x, ay: this.sel.y, bx: x, by: y,
@@ -273,6 +297,10 @@ ChessGame.prototype.process = function(e) {
     else if (msg.Cmd == "stat") {
         document.getElementById("numPlayers").innerHTML = msg.NumPlayers;
     }
+    else if (msg.Cmd == "select") {
+        this.moves = msg.Moves;
+        this.render();
+    }
 }
 
 ChessGame.prototype.tick = function() {
@@ -287,8 +315,6 @@ ChessGame.prototype.tick = function() {
                 this.remainingB = 0;
         }
     }
-
-
     this.renderClock(0, 0, 130,
         this.totalTime > 0 ? this.remainingA / this.totalTime : 0, true);
     this.renderClock(150, 0, 130,
