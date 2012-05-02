@@ -471,3 +471,11 @@ func (t *Board) Moves(ax, ay int) (moves []pos) {
     }
     return
 }
+
+func (t *Board) Checkmate() bool {
+    return t.status&CheckFlag != 0 && t.status&StalemateFlag != 0
+}
+
+func (t *Board) Stalemate() bool {
+    return t.status&StalemateFlag != 0 && t.status&CheckFlag == 0
+}

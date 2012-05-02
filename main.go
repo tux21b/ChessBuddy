@@ -142,9 +142,29 @@ func play(a, b *Player) {
             if !a.White {
                 msg.RemainingA, msg.RemainingB = b.Remaining, a.Remaining
             }
-            a, b = b, a
             a.Out <- msg
             b.Out <- msg
+
+            log.Println("Status:", board.status)
+            if board.Checkmate() {
+                msg = Message{
+                    Cmd:  "msg",
+                    Text: fmt.Sprintf("Checkmate: %v wins!", b),
+                }
+                b.Out <- msg
+                a.Out <- msg
+                return
+            } else if board.Stalemate() {
+                msg = Message{
+                    Cmd:  "msg",
+                    Text: fmt.Sprintf("Stalemate", b),
+                }
+                b.Out <- msg
+                a.Out <- msg
+                return
+            }
+
+            a, b = b, a
         } else if msg.Cmd == "select" && msg.Turn == board.Turn() &&
             msg.White == board.White() {
             msg.Moves = board.Moves(msg.Ax, msg.Ay)
