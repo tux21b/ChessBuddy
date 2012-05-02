@@ -142,6 +142,7 @@ func play(a, b *Player) {
             if !a.White {
                 msg.RemainingA, msg.RemainingB = b.Remaining, a.Remaining
             }
+            a, b = b, a
             a.Out <- msg
             b.Out <- msg
 
@@ -163,8 +164,6 @@ func play(a, b *Player) {
                 a.Out <- msg
                 return
             }
-
-            a, b = b, a
         } else if msg.Cmd == "select" && msg.Turn == board.Turn() &&
             msg.White == board.White() {
             msg.Moves = board.Moves(msg.Ax, msg.Ay)
