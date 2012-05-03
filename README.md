@@ -37,12 +37,14 @@ Features
  * move history displays all moves using standard algebraic notation (SAN)
 
 
-Missing Features
-----------------
+Missing / Planned Features
+--------------------------
 
-* en passant attacks and promotion
-* invite a specific person by sharing a custom URL
-
+* support for underpomotion (currently pawns are always promoted to queens)
+* add some animations to the javascript interface
+* add a couple of AI players (maybe by connecting another engine such as
+  gnuchess or crafty) which can be selected if no other visitors are available
+* starting new games without refreshing the page
 
 License
 -------
