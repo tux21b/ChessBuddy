@@ -25,6 +25,7 @@ function ChessGame(canvas, clocks, addr) {
     this.remainingB = 0;
     this.moves = [];
     this.msg = "Connecting...";
+    this.anim = {};
 
     var _this = this;
 
@@ -111,8 +112,13 @@ ChessGame.prototype.render = function() {
                     ctx.font = '30pt "Helvetica Neue", Helvetica, Arial, sans-serif';
                 }
             }
-            ctx.fillText(SYMBOLS[this.board[p]+6],
-                border+(x+0.5)*size, border+(y+0.5)*size);
+            var xp = border+(x+0.5)*size;
+            var yp = border+(y+0.5)*size;
+            if (p in this.anim) {
+                xp = this.anim[p].x;
+                yp = this.anim[p].y;
+            }
+            ctx.fillText(SYMBOLS[this.board[p]+6], xp, yp);
         }
     }
 
@@ -146,6 +152,37 @@ ChessGame.prototype.render = function() {
         this.totalTime > 0 ? this.remainingA / this.totalTime : 0, true);
     this.renderClock(150, 0, 130,
         this.totalTime > 0 ? this.remainingB / this.totalTime : 0, false);
+
+    var _this = this;
+    for (var _a in this.anim) {
+        this.requestAnim()(function(t) {
+            if (t == undefined) {
+                t = Date.now();
+            }
+            for (var a in _this.anim) {
+                var an = _this.anim[a];
+                var p = (t - an.tstart) / (an.tend - an.tstart);
+
+                var x0 = _this.color > 0 ? (an.src&7) : 7-(an.src&7);
+                var y0 = _this.color > 0 ? 7-(an.src>>3) : (an.src>>3);
+                var x1 = _this.color > 0 ? (an.dst&7) : 7-(an.dst&7);
+                var y1 = _this.color > 0 ? 7-(an.dst>>3) : (an.dst>>3);
+
+                x0 = border+(x0+0.5)*size;
+                x1 = border+(x1+0.5)*size;
+                y0 = border+(y0+0.5)*size;
+                y1 = border+(y1+0.5)*size;
+                an.x = x0+(x1-x0)*p;
+                an.y = y0+(y1-y0)*p;
+
+                if (t > an.tend) {
+                    delete _this.anim[a];
+                }
+            }
+            _this.render();
+        });
+        return;
+    }
 };
 
 
@@ -285,6 +322,11 @@ ChessGame.prototype.process = function(e) {
             document.getElementById("history").innerHTML +=
                 msg.History + " ";
         }
+        var now = Date.now();
+        var dist = Math.sqrt((msg.Ax-msg.Bx)*(msg.Ax-msg.Bx)+
+            (msg.Ay-msg.By)*(msg.Ay-msg.By));
+        this.anim[msg.By*8+msg.Bx] = {tstart: now, tend: now+150*dist,
+            src: msg.Ay*8+msg.Ax, dst: msg.By*8+msg.Bx};
         this.render();
     }
     else if (msg.Cmd == "start") {
@@ -298,6 +340,8 @@ ChessGame.prototype.process = function(e) {
         this.totalTime = msg.RemainingA;
         this.remainingA = msg.RemainingA;
         this.remainingB = msg.RemainingB;
+        var now = Date.now()
+        this.anim = {};
         this.render();
     }
     else if (msg.Cmd == "msg") {
@@ -332,4 +376,15 @@ ChessGame.prototype.tick = function() {
         this.totalTime > 0 ? this.remainingA / this.totalTime : 0, true);
     this.renderClock(150, 0, 130,
         this.totalTime > 0 ? this.remainingB / this.totalTime : 0, false);
+}
+
+ChessGame.prototype.requestAnim = function() {
+    return window.requestAnimationFrame ||
+        window.webkitRequestAnimationFrame ||
+        window.mozRequestAnimationFrame ||
+        window.oRequestAnimationFrame ||
+        window.msRequestAnimationFrame ||
+        function (callback) {
+            window.setTimeout(callback, 1000 / 60);
+        };
 }
