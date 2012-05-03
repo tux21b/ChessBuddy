@@ -258,15 +258,18 @@ func (b *Board) Move(src, dst Square) bool {
         return false
     }
 
-    if b.board[src]&PieceMask == K {
-        switch {
-        case src == 4 && dst == 6:
+    if src == 4 && b.board[src] == K|White {
+        switch dst {
+        case 6:
             return b.doCastle(4, 7)
-        case src == 4 && dst == 2:
+        case 2:
             return b.doCastle(4, 0)
-        case src == 60 && dst == 63:
-            return b.doCastle(60, 62)
-        case src == 60 && dst == 58:
+        }
+    } else if src == 60 && b.board[src] == K|Black {
+        switch dst {
+        case 62:
+            return b.doCastle(60, 63)
+        case 58:
             return b.doCastle(60, 56)
         }
     }
@@ -295,14 +298,14 @@ func (b *Board) Moves(src Square) (moves []Square) {
             moves = append(moves, dst)
         }
     }
-    if b.color == White {
+    if b.board[src] == K|White {
         if b.canCastle(4, 7) {
             moves = append(moves, 6)
         }
         if b.canCastle(4, 0) {
             moves = append(moves, 2)
         }
-    } else if b.color == Black {
+    } else if b.board[src] == K|Black {
         if b.canCastle(60, 63) {
             moves = append(moves, 62)
         }
