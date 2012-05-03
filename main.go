@@ -256,8 +256,12 @@ var listenAddr *string = flag.String("http", ":8000",
     "listen on this http address")
 
 func main() {
-    flag.Parse()
     runtime.GOMAXPROCS(runtime.NumCPU())
+    flag.Parse()
+    if flag.NArg() > 0 {
+        flag.Usage()
+        return
+    }
 
     p, err := build.Default.Import(basePkg, "", build.FindOnly)
     if err != nil {

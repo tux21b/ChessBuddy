@@ -239,6 +239,13 @@ ChessGame.prototype.process = function(e) {
     var msg = JSON.parse(e.data);
 
     if (msg.Cmd == "move") {
+        if (this.board[msg.By*8+msg.Bx] == 0 && msg.Ax != msg.Bx) {
+            if (this.board[msg.Ay*8+msg.Ax] == 6) {
+                this.board[(msg.By-1)*8+msg.Bx] = 0;
+            } else if (this.board[msg.Ay*8+msg.Ax] == -6) {
+                this.board[(msg.By+1)*8+msg.Bx] = 0;
+            }
+        }
         this.board[msg.By*8+msg.Bx] = this.board[msg.Ay*8+msg.Ax];
         this.board[msg.Ay*8+msg.Ax] = 0;
         if (msg.History == "0-0") {
@@ -257,6 +264,12 @@ ChessGame.prototype.process = function(e) {
                 this.board[59] = this.board[56];
                 this.board[56] = 0;
             }
+        }
+        if (this.board[msg.By*8+msg.Bx] == 6 && msg.By == 7) {
+            this.board[msg.By*8+msg.Bx] = 2;
+        }
+        if (this.board[msg.By*8+msg.Bx] == -6 && msg.By == 0) {
+            this.board[msg.By*8+msg.Bx] = -2;
         }
         this.turn = msg.Turn;
         this.white = !msg.White;

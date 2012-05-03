@@ -108,6 +108,9 @@ type Board struct {
     // color of the current side to move
     color uint8
 
+    // possible square for en-passant captures
+    eps Square
+
     // is the current player in check or stalemate?
     check, stalemate bool
 
@@ -135,6 +138,7 @@ func NewBoard() *Board {
         },
         occupied: 0xffff00000000ffff,
         color:    White,
+        eps:      -1,
     }
 }
 
@@ -282,6 +286,27 @@ func (b *Board) Move(src, dst Square) bool {
     b.board[dst], b.board[src] = b.board[src], 0
     b.occupied &^= Bitboard(1) << uint(src)
     b.occupied |= Bitboard(1) << uint(dst)
+
+    // additional rules for en-passant captures
+    if b.board[dst] == P|White && dst == b.eps {
+        b.board[dst-8] = 0
+        b.occupied &^= Bitboard(1) << uint(dst-8)
+    } else if b.board[dst] == P|Black && dst == b.eps {
+        b.board[dst+8] = 0
+        b.occupied &^= Bitboard(1) << uint(dst+8)
+    }
+    b.eps = -1
+    if b.board[dst] == P|White && dst-src == 16 {
+        b.eps = dst - 8
+    } else if b.board[dst] == P|Black && dst-src == -16 {
+        b.eps = dst + 8
+    }
+
+    // promotion
+    if b.board[dst]&PieceMask == P && (dst>>3 == 0 || dst>>3 == 7) {
+        b.board[dst] = Q | (b.board[dst] & ColorMask)
+    }
+
     b.moved |= Bitboard(1) << uint(src)
     b.color ^= ColorMask
     b.check, b.stalemate = b.isCheck(), b.isStalemate()
@@ -334,9 +359,10 @@ func (b *Board) mayMove(src, dst Square) bool {
     }
 
     // additional rules for pawn movements and captures
-    if piece&PieceMask == P && ((b.board[dst] == 0 && src&7 != dst&7) ||
-        (piece == P|White && (src > dst || (x88diff == 152 && src>>3 != 1))) ||
-        (piece == P|Black && (src < dst || (x88diff == 88 && src>>3 != 6)))) {
+    if piece&PieceMask == P &&
+        ((b.board[dst] == 0 && src&7 != dst&7 && dst != b.eps) ||
+            (piece == P|White && (src > dst || (x88diff == 152 && src>>3 != 1))) ||
+            (piece == P|Black && (src < dst || (x88diff == 88 && src>>3 != 6)))) {
         return false
     }
 
@@ -470,14 +496,15 @@ func (b *Board) formatMove(src, dst Square) string {
         }
     }
     // pawn captures always include the file, even if not ambigous
-    if file || (b.board[src]&PieceMask == P && b.board[dst] != 0) {
+    capture := b.board[dst] != 0 || (b.board[src]&PieceMask == P && b.eps == dst)
+    if file || (b.board[src]&PieceMask == P && capture) {
         buf.WriteByte('a' + byte(src&7))
     }
     if rank {
         buf.WriteByte('1' + byte(src>>3))
     }
 
-    if b.board[dst] != 0 {
+    if capture {
         buf.WriteByte('x')
     }
 
