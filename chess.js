@@ -326,7 +326,7 @@ ChessGame.prototype.process = function(e) {
         var dist = Math.sqrt((msg.Ax-msg.Bx)*(msg.Ax-msg.Bx)+
             (msg.Ay-msg.By)*(msg.Ay-msg.By));
         this.anim[msg.By*8+msg.Bx] = {tstart: now, tend: now+150*dist,
-            src: msg.Ay*8+msg.Ax, dst: msg.By*8+msg.Bx, x: 0, y: 0};
+            src: msg.Ay*8+msg.Ax, dst: msg.By*8+msg.Bx, x: -100, y: -100};
         this.render();
     }
     else if (msg.Cmd == "start") {
