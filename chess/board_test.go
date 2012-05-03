@@ -1,4 +1,4 @@
-package main
+package chess
 
 import (
     "strings"
@@ -12,8 +12,8 @@ func testGame(t *testing.T, text string) {
             continue // skip turn numbers
         }
         prev := *b
-        if !b.MoveSAN(mv) {
-            t.Fatalf("the move %q failed. board=%q", mv, b)
+        if err := b.MoveSAN(mv); err != nil {
+            t.Fatalf("the move %q failed. board=%q, err=%v", mv, b, err)
         }
         mv = strings.Trim(mv, "!?")
         if log := b.LastMove(); log != mv {

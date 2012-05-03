@@ -9,6 +9,7 @@ import (
     "code.google.com/p/go.net/websocket"
     "flag"
     "fmt"
+    "github.com/tux21b/ChessBuddy/chess"
     "go/build"
     "html/template"
     "log"
@@ -33,7 +34,7 @@ type Message struct {
     History                string
     RemainingA, RemainingB time.Duration
     Text                   string
-    Moves                  []pos
+    Moves                  []chess.Square
 }
 
 type Player struct {
@@ -91,7 +92,7 @@ func play(a, b *Player) {
 
     log.Println("Starting new game")
 
-    board := NewBoard()
+    board := chess.NewBoard()
     if rand.Float32() > 0.5 {
         a, b = b, a
     }
@@ -128,8 +129,10 @@ func play(a, b *Player) {
             break
         }
         if msg.Cmd == "move" && msg.Turn == board.Turn() &&
-            msg.White == board.White() &&
-            board.Move(msg.Ax, msg.Ay, msg.Bx, msg.By) {
+            msg.White == (board.Color() == chess.White) &&
+            msg.Ax >= 0 && msg.Ax < 8 && msg.Ay >= 0 && msg.Ay < 8 &&
+            msg.Bx >= 0 && msg.Bx < 8 && msg.By >= 0 && msg.By < 8 &&
+            board.Move(chess.Square(msg.Ax+msg.Ay*8), chess.Square(msg.Bx+msg.By*8)) {
 
             msg.History = board.LastMove()
             now := time.Now()
@@ -146,7 +149,6 @@ func play(a, b *Player) {
             a.Out <- msg
             b.Out <- msg
 
-            log.Println("Status:", board.status)
             if board.Checkmate() {
                 msg = Message{
                     Cmd:  "msg",
@@ -164,9 +166,8 @@ func play(a, b *Player) {
                 a.Out <- msg
                 return
             }
-        } else if msg.Cmd == "select" && msg.Turn == board.Turn() &&
-            msg.White == board.White() {
-            msg.Moves = board.Moves(msg.Ax, msg.Ay)
+        } else if msg.Cmd == "select" {
+            msg.Moves = board.Moves(chess.Square(msg.Ax + msg.Ay*8))
             a.Out <- msg
         }
     }
