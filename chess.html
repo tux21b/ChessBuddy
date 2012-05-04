@@ -29,9 +29,29 @@
             </div>
         </aside>
 
-        <canvas id="board" width="400" height="400">
-            Your browser does not support the canvas element.
-        </canvas>
+
+        <div id="game">
+            <canvas id="base" width="400" height="400" class="layer" style="z-index: 10;">
+                Your browser does not support the canvas element.
+            </canvas>
+            <canvas id="mark" width="400" height="400" class="layer" style="z-index: 20;">
+            </canvas>
+            <canvas id="anim" width="400" height="400" class="layer" style="z-index: 30;">
+            </canvas>
+            <div id="dlg-connect" class="dialog" style="display: block;">
+                <h3 id="connect">Connecting…</h3>
+            </div>
+            <div id="dlg-waiting" class="dialog">
+                <h3>Waiting for another player…</h3>
+            </div>
+            <div id="dlg-result" class="dialog">
+                <h3 id="result">Checkmate: White wins!</h3>
+                <p>Do you want to <a href="/">start a new game</a>?</p>
+            </div>
+            <div id="dlg-promote" class="dialog">
+                Promote to?
+            </div>
+        </div>
         <script type="text/javascript">
             var canvas = document.getElementById("board");
             var clocks = document.getElementById("clocks");

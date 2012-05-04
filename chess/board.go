@@ -547,9 +547,9 @@ func (b *Board) Color() uint8 {
     return b.color
 }
 
-// Turn returns the current turn number.
+// Turn returns the current halfturn number starting by one.
 func (b *Board) Turn() int {
-    return len(b.hist)/2 + 1
+    return len(b.hist) + 1
 }
 
 // LastMove returns the last half move formatted using the extended algebraic

@@ -92,3 +92,64 @@ label {
   font-weight: bold;
   color: #333;
 }
+
+#game {
+  width: 400px;
+  height: 400px;
+  position: relative;
+  -moz-box-shadow: 0 0 5px #666;
+  -webkit-box-shadow: 0 0 5px#666;
+  box-shadow: 0 0 5px #666;
+  -moz-user-select: none;
+  -khtml-user-select: none;
+  -webkit-user-select: none;
+}
+
+canvas.layer {
+  width: 400px;
+  height: 400px;
+  top: 0;
+  left: 0;
+  position: absolute;
+}
+
+div.dialog {
+  position: absolute;
+  width: 100%;
+  left: 0;
+  top: 50%;
+  margin-top: -2.726em;
+  height: 5.452em;
+  background: rgba(220, 220, 220, 0.8);
+  z-index: 40;
+  color: #000;
+  text-align: center;
+  display: none;
+}
+
+div.dialog h3 {
+  font-size: 2.1em;
+  line-height: 100%;
+  color: #000;
+  margin: 0;
+  padding: .4em 0 .2em;
+  font-weight: normal;
+}
+
+div.dialog p {
+  margin: 0;
+  font-size: 1.4em;
+  line-height: 100%;
+  padding: 0 0 .38em;
+}
+
+div#dlg-result {
+  height: 5.292em;
+  margin-top: -2.646em;
+}
+
+div#dlg-connect,
+div#dlg-waiting {
+  height: 3.78em;
+  margin-top: -1.89em;
+}

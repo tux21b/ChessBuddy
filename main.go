@@ -25,21 +25,21 @@ import (
 // General message struct which is used for parsing client requests and sending
 // back responses.
 type Message struct {
-    Cmd                    string
-    Turn                   int
-    Ax, Ay                 int
-    Bx, By                 int
-    White                  bool
+    Cmd                    string       `json:"cmd"`
+    Turn                   int          `json:"turn"`
+    Src                    chess.Square `json:"src"`
+    Dst                    chess.Square `json:"dst"`
+    Color                  uint8        `json:"color"`
     NumPlayers             int32
     History                string
     RemainingA, RemainingB time.Duration
     Text                   string
-    Moves                  []chess.Square
+    Moves                  []chess.Square `json:"moves"`
 }
 
 type Player struct {
     Conn      *websocket.Conn
-    White     bool
+    Color     uint8
     Remaining time.Duration
     Out       chan<- Message
 }
@@ -57,10 +57,13 @@ func (p *Player) Alive() bool {
 }
 
 func (p *Player) String() string {
-    if p.White {
+    switch p.Color {
+    case chess.White:
         return "White"
+    case chess.Black:
+        return "Black"
     }
-    return "Black"
+    return "Unknown"
 }
 
 // Available Players which are currently looking for a taff opponent.
@@ -96,13 +99,14 @@ func play(a, b *Player) {
     if rand.Float32() > 0.5 {
         a, b = b, a
     }
-    a.White = true
+    a.Color = chess.White
+    b.Color = chess.Black
     a.Remaining = *timeLimit
     b.Remaining = *timeLimit
 
-    a.Out <- Message{Cmd: "start", White: a.White, Turn: board.Turn(),
+    a.Out <- Message{Cmd: "start", Color: a.Color, Turn: board.Turn(),
         RemainingA: a.Remaining, RemainingB: b.Remaining}
-    b.Out <- Message{Cmd: "start", White: b.White, Turn: board.Turn(),
+    b.Out <- Message{Cmd: "start", Color: b.Color, Turn: board.Turn(),
         RemainingA: a.Remaining, RemainingB: b.Remaining}
 
     start := time.Now()
@@ -129,11 +133,8 @@ func play(a, b *Player) {
             break
         }
         if msg.Cmd == "move" && msg.Turn == board.Turn() &&
-            msg.White == (board.Color() == chess.White) &&
-            msg.Ax >= 0 && msg.Ax < 8 && msg.Ay >= 0 && msg.Ay < 8 &&
-            msg.Bx >= 0 && msg.Bx < 8 && msg.By >= 0 && msg.By < 8 &&
-            board.Move(chess.Square(msg.Ax+msg.Ay*8), chess.Square(msg.Bx+msg.By*8)) {
-
+            a.Color == board.Color() && board.Move(msg.Src, msg.Dst) {
+            msg.Color = a.Color
             msg.History = board.LastMove()
             now := time.Now()
             a.Remaining -= now.Sub(start)
@@ -142,7 +143,7 @@ func play(a, b *Player) {
             }
             start = now
             msg.RemainingA, msg.RemainingB = a.Remaining, b.Remaining
-            if !a.White {
+            if a.Color == chess.Black {
                 msg.RemainingA, msg.RemainingB = b.Remaining, a.Remaining
             }
             a, b = b, a
@@ -167,7 +168,7 @@ func play(a, b *Player) {
                 return
             }
         } else if msg.Cmd == "select" {
-            msg.Moves = board.Moves(chess.Square(msg.Ax + msg.Ay*8))
+            msg.Moves = board.Moves(msg.Src)
             a.Out <- msg
         }
     }

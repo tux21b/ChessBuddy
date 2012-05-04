@@ -5,17 +5,37 @@
  * All rights reserved. Distributed under the Simplified BSD License.
  */
 
-var SYMBOLS = ["♟", "♞", "♝", "♜", "♛", "♚", " ", "♔", "♕", "♖", "♗", "♘", "♙"];
+var P = 1;
+var N = 2;
+var B = 3;
+var R = 4;
+var Q = 5;
+var K = 6;
+
+var WHITE = 8;
+var BLACK = 16;
+
+var PIECE_MASK = 7;
+var COLOR_MASK = 24;
+
+var PIECES = [
+    " ", "♟", "♞", "♝", "♜", "♛", "♚", "?",
+    " ", "♙", "♘", "♗", "♖", "♕", "♔", "?",
+];
+
+var requestAnim = window.requestAnimationFrame ||
+    window.webkitRequestAnimationFrame ||
+    window.mozRequestAnimationFrame ||
+    window.oRequestAnimationFrame ||
+    window.msRequestAnimationFrame ||
+    function (callback) { window.setTimeout(callback, 1000 / 60); };
 
 
 function ChessGame(canvas, clocks, addr) {
-    this.canvas = canvas;
-    this.canvas_ctx = canvas.getContext("2d");
     this.clocks = clocks;
     this.clocks_ctx = clocks.getContext("2d");
     this.color = 0;
     this.turn = 0;
-    this.white = true;
     this.board = [];
     this.sel = null;
     for (var i = 0; i < 64; i++)
@@ -24,171 +44,212 @@ function ChessGame(canvas, clocks, addr) {
     this.remainingA = 0;
     this.remainingB = 0;
     this.moves = [];
-    this.msg = "Connecting...";
     this.anim = {};
+    this.size = 400 / 9.0;
+
+    this.game = document.getElementById("game");
+    this.ctx_base = document.getElementById("base").getContext("2d");
+    this.ctx_mark = document.getElementById("mark").getContext("2d");
+    this.ctx_anim = document.getElementById("anim").getContext("2d");
+
+    this.renderBase();
+    this.renderClocks();
 
     var _this = this;
 
     if ('WebSocket' in window) {
         this.ws = new WebSocket(addr);
         this.ws.onopen = function(e) {
-            _this.msg = "Waiting for another player...";
-            _this.render();
+            document.getElementById("dlg-connect").style.display = 'none';
+            document.getElementById("dlg-waiting").style.display = 'block';
         }
         this.ws.onmessage = function(e) {
             _this.process(e);
         };
         this.ws.onclose = function(e) {
-            if (!_this.msg) {
-                _this.msg = "Connection lost... Reload?";
+            if (document.getElementById("dlg-result").style.display == 'none') {
+                document.getElementById("dlg-waiting").style.display = 'none';
+                document.getElementById("dlg-connect").style.display = 'none';
+                document.getElementById("result").innerHTML = "Connection lost";
+                document.getElementById("dlg-result").style.display = 'block';
             }
-            _this.render();
+            _this.color = 0;
         };
         this.ws.onerror = function(e) {
-            _this.msg = "Connection Error";
-            _this.render();
+            document.getElementById("dlg-result").style.display = 'none';
+            document.getElementById("dlg-waiting").style.display = 'none';
+            document.getElementById("dlg-connect").style.display = 'none';
+            document.getElementById("result").innerHTML = "Connection error";
+            document.getElementById("dlg-result").style.display = 'block';
+            _this.color = 0;
         }
     } else {
-        _this.msg = "Missing WebSocket Support";
-        _this.render();
+        document.getElementById("connect").innerHTML = "Missing WebSocket Support";
     }
-    this.canvas.addEventListener('click', function(e) {
+    this.game.addEventListener('click', function(e) {
         _this.click(e)
     });
-    this.render();
 
     this.clocks_int = window.setInterval(function() {
         _this.tick();
     }, 1000);
 
     window.onbeforeunload = function(e) {
-        if (!_this.msg) {
+        if (_this.color != 0) {
             return "Leaving the page will cancel the current game.";
         }
     };
-}
+};
 
 
-ChessGame.prototype.render = function() {
-    var ctx = this.canvas_ctx;
-    var size = Math.min(this.canvas.width, this.canvas.height) / 9.0;
-    var border = 0.5*size;
+ChessGame.prototype.renderBase = function() {
+    var ctx = this.ctx_base;
+    var size = this.size;
 
-    /* draw the checker board */
     ctx.fillStyle = "#6288b9";
     ctx.fillRect(0, 0, 9*size, 9*size);
-    for (var y = 0; y < 8; y++) {
-        for (var x = 0; x < 8; x++) {
-            ctx.fillStyle = ((x & 1) != (y & 1)) ? "#83A5D2" : "#FEFEFE";
-            ctx.fillRect(border+x*size, border+y*size, size, size);
-        }
-    }
 
-    /* draw labels */
     ctx.font = 'bold 10pt "Helvetica Neue", Helvetica, Arial, sans-serif';
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillStyle = "#FFFFFF";
     if (this.color != 0) {
         for (var i = 0; i < 8; i++) {
-            var row = this.color > 0 ? 7-i : i;
-            var col = this.color > 0 ? i : 7-i;
-            ctx.fillText(row+1, 0.25*size, (i+1)*size);
-            ctx.fillText(row+1, 8.75*size, (i+1)*size);
-            ctx.fillText(String.fromCharCode(col+97), (i+1)*size, 0.25*size);
-            ctx.fillText(String.fromCharCode(col+97), (i+1)*size, 8.75*size);
+            var rank = this.color == WHITE ? 7-i : i;
+            var file = this.color == WHITE ? i : 7-i;
+            ctx.fillText(rank+1, 0.25*size, (i+1)*size);
+            ctx.fillText(rank+1, 8.75*size, (i+1)*size);
+            ctx.fillText(String.fromCharCode(file+97), (i+1)*size, 0.25*size);
+            ctx.fillText(String.fromCharCode(file+97), (i+1)*size, 8.75*size);
         }
     }
 
-    /* draw figures (incl. selection) */
-    for (var y = 0; y < 8; y++) {
-        for (var x = 0; x < 8; x++) {
-            ctx.fillStyle = "#000000";
-            ctx.font = '26pt "Helvetica Neue", Helvetica, Arial, sans-serif';
-            var p = this.color > 0 ? (7-y)*8+x : y*8+7-x;
-            if (this.sel != null && p == this.sel.y*8+this.sel.x) {
-                ctx.fillStyle = "#ff0000";
-                if (this.moves) {
-                    ctx.font = '30pt "Helvetica Neue", Helvetica, Arial, sans-serif';
-                }
-            }
-            var xp = border+(x+0.5)*size;
-            var yp = border+(y+0.5)*size;
-            if (p in this.anim) {
-                xp = this.anim[p].x;
-                yp = this.anim[p].y;
-            }
-            ctx.fillText(SYMBOLS[this.board[p]+6], xp, yp);
-        }
-    }
-
-    /* draw possible moves */
-    if (this.sel && this.moves) {
-        ctx.font = '26pt "Helvetica Neue", Helvetica, Arial, sans-serif';
-        for (var i = 0; i < this.moves.length; i++) {
-            ctx.fillStyle = "rgba(60, 60, 60, 0.2)";
-            var x = this.color > 0 ? this.moves[i]&7 : 7-(this.moves[i]&7);
-            var y = this.color > 0 ? 7-(this.moves[i]>>3) : this.moves[i]>>3;
-            var p = SYMBOLS[this.board[this.sel.y*8+this.sel.x]+6];
-            var f = this.color > 0 ? (7-y)*8+x : y*8+7-x;
-            if (this.board[f] != 0) {
-                ctx.fillStyle = "rgba(255, 0, 0, 0.6)";
-                p = "✘";
-            }
-            ctx.fillText(p, border+(x+0.5)*size, border+(y+0.5)*size);
-        }
-    }
-
-    /* draw messages */
-    if (this.msg) {
-        ctx.fillStyle = "rgba(220, 220, 220, 0.8)";
-        ctx.fillRect(0, 3.75*size, 9*size, 1.5*size);
-        ctx.fillStyle = "#000000";
-        ctx.font = '20pt "Helvetica Neue", Helvetica, Arial, sans-serif';
-        ctx.fillText(this.msg, 4.5*size, 4.5*size);
-    }
-
-    this.renderClock(0, 0, 130,
-        this.totalTime > 0 ? this.remainingA / this.totalTime : 0, true);
-    this.renderClock(150, 0, 130,
-        this.totalTime > 0 ? this.remainingB / this.totalTime : 0, false);
-
-    var _this = this;
-    for (var _a in this.anim) {
-        this.requestAnim()(function(t) {
-            if (t == undefined) {
-                t = Date.now();
-            }
-            for (var a in _this.anim) {
-                var an = _this.anim[a];
-                var p = (t - an.tstart) / (an.tend - an.tstart);
-
-                var x0 = _this.color > 0 ? (an.src&7) : 7-(an.src&7);
-                var y0 = _this.color > 0 ? 7-(an.src>>3) : (an.src>>3);
-                var x1 = _this.color > 0 ? (an.dst&7) : 7-(an.dst&7);
-                var y1 = _this.color > 0 ? 7-(an.dst>>3) : (an.dst>>3);
-
-                x0 = border+(x0+0.5)*size;
-                x1 = border+(x1+0.5)*size;
-                y0 = border+(y0+0.5)*size;
-                y1 = border+(y1+0.5)*size;
-                an.x = x0+(x1-x0)*p;
-                an.y = y0+(y1-y0)*p;
-
-                if (t > an.tend) {
-                    delete _this.anim[a];
-                }
-            }
-            _this.render();
-        });
-        return;
+    for (var sq = 0; sq < 64; sq++) {
+        this.renderBaseSq(sq);
     }
 };
 
+ChessGame.prototype.renderBaseSq = function(sq) {
+    var ctx = this.ctx_base;
+    var size = this.size;
 
-ChessGame.prototype.renderClock = function(x, y, size, t, white) {
+    var x = (this.color != BLACK) ? sq&7 : 7-(sq&7);
+    var y = (this.color != BLACK) ? 7-(sq>>3) : sq>>3;
+    ctx.fillStyle = ((x&1) == (y&1)) ? "#FEFEFE" : "#83A5D2";
+    ctx.fillRect(0.5*size+x*size, 0.5*size+y*size, size, size);
+
+    ctx.font = '26pt "Helvetica Neue", Helvetica, Arial, sans-serif';
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = (sq == this.sel) ? "#FF0000" : "#000000";
+    ctx.fillText(PIECES[this.board[sq]&15], (x+1)*size, (y+1)*size);
+};
+
+ChessGame.prototype.renderMarkers = function(src, moves) {
+    var ctx = this.ctx_mark;
+    var size = this.size;
+
+    ctx.clearRect(0, 0, size*9, size*9);
+    if (moves) {
+        ctx.font = '26pt "Helvetica Neue", Helvetica, Arial, sans-serif';
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        for (var i = 0; i < moves.length; i++) {
+            var sq = moves[i];
+            var x = (this.color == WHITE) ? sq&7 : 7-(sq&7);
+            var y = (this.color == WHITE) ? 7-(sq>>3) : sq>>3;
+
+            ctx.fillStyle = "rgba(60, 60, 60, 0.2)";
+            var p = PIECES[this.board[src]&15];
+            if (this.board[sq] != 0) {
+                ctx.fillStyle = "rgba(255, 0, 0, 0.6)";
+                p = "✘"
+            }
+            ctx.fillText(p, (x+1)*size, (y+1)*size);
+        }
+    }
+};
+
+ChessGame.prototype.renderAnim = function(t) {
+    var ctx = this.ctx_anim;
+    var size = this.size;
+
+    ctx.clearRect(0, 0, size*9, size*9);
+
+    ctx.font = '26pt "Helvetica Neue", Helvetica, Arial, sans-serif';
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#000000";
+
+    if (t == undefined) {
+        t = Date.now();
+    }
+    var update = false;
+    for (var a in this.anim) {
+        var an = this.anim[a];
+        var p = (t - an.t0) / (an.t1 - an.t0);
+        if (p >= 1.0) {
+            delete this.anim[a];
+            p = 1.0;
+            this.renderBaseSq(a);
+        }
+        ctx.fillText(PIECES[this.board[a]&15],
+            an.x0+(an.x1-an.x0)*p,
+            an.y0+(an.y1-an.y0)*p);
+        update = true;
+    }
+
+    if (update) {
+        var _this = this;
+        requestAnim(function(t) {_this.renderAnim(t)});
+    }
+};
+
+ChessGame.prototype.movePiece = function(src, dst) {
+    var first = true;
+    for (a in this.anim) {
+        first = false;
+        break;
+    }
+
+    var size = this.size;
+    var now = Date.now();
+    var dist = Math.sqrt(((src&7)-(dst&7))*((src&7)-(dst&7))+
+        ((src>>3)-(dst>>3))*((src>>3)-(dst>>3)));
+
+    this.anim[dst] = {
+        t0: now,
+        t1: now+150*dist,
+        x0: (this.color == WHITE ? (1+(src&7))*size : (8-(src&7))*size),
+        y0: (this.color == WHITE ? (8-(src>>3))*size : (1+(src>>3))*size),
+        x1: (this.color == WHITE ? (1+(dst&7))*size : (8-(dst&7))*size),
+        y1: (this.color == WHITE ? (8-(dst>>3))*size : (1+(dst>>3))*size),
+    };
+
+    this.board[dst] = this.board[src];
+    this.board[src] = 0;
+    this.renderBaseSq(src);
+
+    if (first) {
+        var _this = this;
+        requestAnim(function(t) {_this.renderAnim(t)});
+    }
+};
+
+ChessGame.prototype.renderClocks = function() {
+    this.renderClock(0, 0, 130,
+        this.totalTime > 0 ? this.remainingA / this.totalTime : 0, WHITE);
+    this.renderClock(150, 0, 130,
+        this.totalTime > 0 ? this.remainingB / this.totalTime : 0, BLACK);
+};
+
+
+ChessGame.prototype.renderClock = function(x, y, size, t, color) {
     var ctx = this.clocks_ctx;
-    var active = (this.white == white);
+    var active = false;
+    if (this.color != 0) {
+        active = (this.turn % 2 == 1) == (color == WHITE);
+    }
 
     ctx.strokeStyle = "#cacad1";
     ctx.fillStyle = "#fafafa";
@@ -212,7 +273,7 @@ ChessGame.prototype.renderClock = function(x, y, size, t, white) {
     ctx.font = 'bold 12pt "Helvetica Neue", Helvetica, Arial, sans-serif';
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(white ? "white" : "black", x+0.5*size, y+0.7*size);
+    ctx.fillText(color == WHITE ? "white" : "black", x+0.5*size, y+0.7*size);
 
     /* draw pointer */
     ctx.fillStyle = active ? "#ee0000" : "#222";
@@ -241,128 +302,128 @@ ChessGame.prototype.click = function(e) {
         y = e.clientY + document.body.scrollTop +
             document.documentElement.scrollTop;
     }
-    x -= this.canvas.offsetLeft;
-    y -= this.canvas.offsetTop;
+    x -= this.game.offsetLeft;
+    y -= this.game.offsetTop;
 
     /* convert to field coordinates */
-    var size = Math.min(canvas.width, canvas.height) / 9.0;
+    var size = this.size;
     x = Math.floor((x - 0.5*size) / size);
     y = 7-Math.floor((y - 0.5*size) / size);
-    if (this.color < 0) {
+    if (this.color == BLACK) {
         x = 7 - x;
         y = 7 - y;
     }
+    var pos = y*8+x;
+    var prev_sel = this.sel;
 
     /* process the mouse click */
-    if (x < 0 || x > 7 || y < 0 || y > 7 || (this.sel != null &&
-        x == this.sel.x && y == this.sel.y)) {
+    if (x < 0 || x > 7 || y < 0 || y > 7 || this.sel == pos) {
         this.sel = null;
-    } else if (this.board[y*8+x]*this.color > 0) {
-        this.sel = {x: x, y: y};
-        this.moves = null;
-        this.ws.send(JSON.stringify({Cmd: "select", Turn: this.turn,
-            Ax: x, Ay: y, White: this.color > 0}));
-    } else if (this.sel != null && this.white == (this.color > 0)) {
-        this.ws.send(JSON.stringify({Cmd: "move", Turn: this.turn,
-            ax: this.sel.x, ay: this.sel.y, bx: x, by: y,
-            White: this.color > 0}));
+    } else if ((this.board[pos]&COLOR_MASK) == this.color) {
+        this.sel = pos;
+        this.ws.send(JSON.stringify({cmd: "select", turn: this.turn, src: pos}));
+    } else if (this.sel != null && (this.turn % 2 == 1) == (this.color == WHITE)) {
+        this.ws.send(JSON.stringify({cmd: "move", turn: this.turn, src: this.sel,
+            dst: pos}));
         this.sel = null;
     }
-    this.render();
+
+    if (this.sel != prev_sel) {
+        this.renderMarkers(this.sel, []);
+        if (prev_sel != null) this.renderBaseSq(prev_sel);
+        if (this.sel != null) this.renderBaseSq(this.sel);
+    }
 }
 
 
 ChessGame.prototype.process = function(e) {
     var msg = JSON.parse(e.data);
 
-    if (msg.Cmd == "move") {
-        if (this.board[msg.By*8+msg.Bx] == 0 && msg.Ax != msg.Bx) {
-            if (this.board[msg.Ay*8+msg.Ax] == 6) {
-                this.board[(msg.By-1)*8+msg.Bx] = 0;
-            } else if (this.board[msg.Ay*8+msg.Ax] == -6) {
-                this.board[(msg.By+1)*8+msg.Bx] = 0;
+    if (msg.cmd == "move") {
+        if (this.board[msg.dst] == 0 && (msg.src&7) != (msg.dst&7)) {
+            if (this.board[msg.src] == (P|WHITE)) {
+                this.board[msg.dst-8] = 0;
+                this.renderBaseSq(msg.dst-8);
+            } else if (this.board[msg.src] == (P|BLACK)) {
+                this.board[msg.dst+8] = 0;
+                this.renderBaseSq(msg.dst+8);
             }
         }
-        this.board[msg.By*8+msg.Bx] = this.board[msg.Ay*8+msg.Ax];
-        this.board[msg.Ay*8+msg.Ax] = 0;
-        if (msg.History == "0-0") {
-            if (msg.White) {
-                this.board[5] = this.board[7];
-                this.board[7] = 0;
-            } else {
-                this.board[61] = this.board[63];
-                this.board[63] = 0;
+        if (this.board[msg.src]==(K|WHITE) && msg.src==4) {
+            if (msg.dst == 6) {
+                this.movePiece(7, 5);
+            } else if (msg.dst == 2) {
+                this.movePiece(0, 3);
             }
-        } else if (msg.History == "0-0-0") {
-            if (msg.White) {
-                this.board[3] = this.board[0];
-                this.board[0] = 0;
-            } else {
-                this.board[59] = this.board[56];
-                this.board[56] = 0;
+        } else if (this.board[msg.src]==(K|BLACK) && msg.src==60) {
+            if (msg.dst == 62) {
+                this.movePiece(63, 61);
+            } else if (msg.dst == 58) {
+                this.movePiece(56, 59);
             }
         }
-        if (this.board[msg.By*8+msg.Bx] == 6 && msg.By == 7) {
-            this.board[msg.By*8+msg.Bx] = 2;
+        this.movePiece(msg.src, msg.dst);
+        if ((this.board[msg.dst] == (P|WHITE)) && (msg.dst>>3) == 7) {
+            this.board[msg.dst] = (Q|WHITE);
         }
-        if (this.board[msg.By*8+msg.Bx] == -6 && msg.By == 0) {
-            this.board[msg.By*8+msg.Bx] = -2;
+        if ((this.board[msg.dst] == (P|BLACK)) && (msg.dst>>3) == 0) {
+            this.board[msg.dst] = (Q|BLACK);
         }
-        this.turn = msg.Turn;
-        this.white = !msg.White;
-        if (this.white) {
-            this.turn++;
-        }
+        this.turn = msg.turn + 1;
         this.remainingA = msg.RemainingA;
         this.remainingB = msg.RemainingB;
-        if (msg.White) {
+        this.renderClocks();
+        if (msg.color == WHITE) {
             document.getElementById("history").innerHTML +=
-                msg.Turn + ".&nbsp;" + msg.History + "&nbsp;";
+                Math.floor((msg.turn+1)/2) + ".&nbsp;" + msg.History + "&nbsp;";
         } else {
             document.getElementById("history").innerHTML +=
                 msg.History + " ";
         }
-        var now = Date.now();
-        var dist = Math.sqrt((msg.Ax-msg.Bx)*(msg.Ax-msg.Bx)+
-            (msg.Ay-msg.By)*(msg.Ay-msg.By));
-        this.anim[msg.By*8+msg.Bx] = {tstart: now, tend: now+150*dist,
-            src: msg.Ay*8+msg.Ax, dst: msg.By*8+msg.Bx, x: -100, y: -100};
-        this.render();
     }
-    else if (msg.Cmd == "start") {
-        this.board = [+3,+5,+4,+2,+1,+4,+5,+3,+6,+6,+6,+6,+6,+6,+6,+6,
-            0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-            -6,-6,-6,-6,-6,-6,-6,-6,-3,-5,-4,-2,-1,-4,-5,-3];
-        this.color = msg.White ? 1 : -1;
-        this.white = true;
-        this.turn = 1;
-        this.msg = null;
+    else if (msg.cmd == "start") {
+        document.getElementById("dlg-waiting").style.display = 'none';
+        this.board = [
+            R|WHITE, N|WHITE, B|WHITE, Q|WHITE,
+            K|WHITE, B|WHITE, N|WHITE, R|WHITE,
+            P|WHITE, P|WHITE, P|WHITE, P|WHITE,
+            P|WHITE, P|WHITE, P|WHITE, P|WHITE,
+            0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0,
+            P|BLACK, P|BLACK, P|BLACK, P|BLACK,
+            P|BLACK, P|BLACK, P|BLACK, P|BLACK,
+            R|BLACK, N|BLACK, B|BLACK, Q|BLACK,
+            K|BLACK, B|BLACK, N|BLACK, R|BLACK,
+        ];
+        this.color = msg.color;
+        this.turn = msg.turn;
         this.totalTime = msg.RemainingA;
         this.remainingA = msg.RemainingA;
         this.remainingB = msg.RemainingB;
-        var now = Date.now()
-        this.anim = {};
-        this.render();
+        this.renderBase();
+        this.renderClocks();
     }
-    else if (msg.Cmd == "msg") {
-        this.msg = msg.Text;
-        this.render();
+    else if (msg.cmd == "msg") {
+        document.getElementById("result").innerHTML = msg.Text;
+        document.getElementById("dlg-result").style.display = "block";
+        this.color = 0;
     }
-    else if (msg.Cmd == "ping") {
+    else if (msg.cmd == "ping") {
         this.ws.send(JSON.stringify({Cmd: "pong"}));
     }
-    else if (msg.Cmd == "stat") {
+    else if (msg.cmd == "stat") {
         document.getElementById("numPlayers").innerHTML = msg.NumPlayers;
     }
-    else if (msg.Cmd == "select") {
-        this.moves = msg.Moves;
-        this.render();
+    else if (msg.cmd == "select" && msg.src == this.sel) {
+        this.renderMarkers(msg.src, msg.moves);
     }
 }
 
 ChessGame.prototype.tick = function() {
-    if (!this.msg) {
-        if (this.white) {
+    if (this.color != 0) {
+        if (this.turn%2 == 1) {
             this.remainingA -= 1000000000;
             if (this.remainingA < 0)
                 this.remainingA = 0;
@@ -372,19 +433,5 @@ ChessGame.prototype.tick = function() {
                 this.remainingB = 0;
         }
     }
-    this.renderClock(0, 0, 130,
-        this.totalTime > 0 ? this.remainingA / this.totalTime : 0, true);
-    this.renderClock(150, 0, 130,
-        this.totalTime > 0 ? this.remainingB / this.totalTime : 0, false);
-}
-
-ChessGame.prototype.requestAnim = function() {
-    return window.requestAnimationFrame ||
-        window.webkitRequestAnimationFrame ||
-        window.mozRequestAnimationFrame ||
-        window.oRequestAnimationFrame ||
-        window.msRequestAnimationFrame ||
-        function (callback) {
-            window.setTimeout(callback, 1000 / 60);
-        };
+    this.renderClocks();
 }
