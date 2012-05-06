@@ -411,7 +411,7 @@ ChessGame.prototype.process = function(e) {
         this.color = 0;
     }
     else if (msg.cmd == "ping") {
-        this.ws.send(JSON.stringify({Cmd: "pong"}));
+        this.ws.send(JSON.stringify({cmd: "pong"}));
     }
     else if (msg.cmd == "stat") {
         document.getElementById("numPlayers").innerHTML = msg.NumPlayers;

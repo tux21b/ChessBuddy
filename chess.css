@@ -143,13 +143,13 @@ div.dialog p {
   padding: 0 0 .38em;
 }
 
+div#dlg-waiting,
 div#dlg-result {
   height: 5.292em;
   margin-top: -2.646em;
 }
 
-div#dlg-connect,
-div#dlg-waiting {
+div#dlg-connect {
   height: 3.78em;
   margin-top: -1.89em;
 }

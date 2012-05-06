@@ -7,6 +7,7 @@ package main
 
 import (
     "code.google.com/p/go.net/websocket"
+    "expvar"
     "flag"
     "fmt"
     "github.com/tux21b/ChessBuddy/chess"
@@ -42,6 +43,7 @@ type Player struct {
     Color     uint8
     Remaining time.Duration
     Out       chan<- Message
+    ReqAI     chan bool
 }
 
 // Check wethever the player is still connected by sending a ping command.
@@ -66,6 +68,12 @@ func (p *Player) String() string {
     return "Unknown"
 }
 
+func (p *Player) Send(msg Message) {
+    if p.Conn != nil {
+        p.Out <- msg
+    }
+}
+
 // Available Players which are currently looking for a taff opponent.
 var available = make(chan *Player, 100)
 
@@ -76,21 +84,30 @@ var numPlayers int32 = 0
 func hookUp() {
     a := <-available
     for {
-        b := <-available
-        if a.Alive() {
-            go play(a, b)
+        select {
+        case b := <-available:
+            if a.Alive() {
+                go play(a, b)
+                a = <-available
+            } else {
+                close(a.Out)
+                a = b
+            }
+        case <-a.ReqAI:
+            go play(a, &Player{})
             a = <-available
-        } else {
-            close(a.Out)
-            a = b
         }
     }
 }
 
 func play(a, b *Player) {
     defer func() {
-        close(a.Out)
-        close(b.Out)
+        if a.Conn != nil {
+            close(a.Out)
+        }
+        if b.Conn != nil {
+            close(b.Out)
+        }
     }()
 
     log.Println("Starting new game")
@@ -99,38 +116,44 @@ func play(a, b *Player) {
     if rand.Float32() > 0.5 {
         a, b = b, a
     }
+
     a.Color = chess.White
-    b.Color = chess.Black
     a.Remaining = *timeLimit
+    b.Color = chess.Black
     b.Remaining = *timeLimit
 
-    a.Out <- Message{Cmd: "start", Color: a.Color, Turn: board.Turn(),
-        RemainingA: a.Remaining, RemainingB: b.Remaining}
-    b.Out <- Message{Cmd: "start", Color: b.Color, Turn: board.Turn(),
-        RemainingA: a.Remaining, RemainingB: b.Remaining}
+    a.Send(Message{Cmd: "start", Color: a.Color, Turn: board.Turn(),
+        RemainingA: a.Remaining, RemainingB: b.Remaining})
+    b.Send(Message{Cmd: "start", Color: b.Color, Turn: board.Turn(),
+        RemainingA: a.Remaining, RemainingB: b.Remaining})
 
     start := time.Now()
     for {
         var msg Message
-        a.Conn.SetReadDeadline(start.Add(a.Remaining))
-        if err := websocket.JSON.Receive(a.Conn, &msg); err != nil {
-            if err, ok := err.(net.Error); ok && err.Timeout() {
-                a.Remaining = 0
-                msg = Message{
-                    Cmd:  "msg",
-                    Text: fmt.Sprintf("Out of time: %v wins!", b),
+        if a.Conn == nil {
+            msg.Cmd, msg.Turn = "move", board.Turn()
+            msg.Src, msg.Dst = board.MoveAI()
+        } else {
+            a.Conn.SetReadDeadline(start.Add(a.Remaining))
+            if err := websocket.JSON.Receive(a.Conn, &msg); err != nil {
+                if err, ok := err.(net.Error); ok && err.Timeout() {
+                    a.Remaining = 0
+                    msg = Message{
+                        Cmd:  "msg",
+                        Text: fmt.Sprintf("Out of time: %v wins!", b),
+                    }
+                    b.Send(msg)
+                    a.Send(msg)
+                } else {
+                    msg = Message{
+                        Cmd:  "msg",
+                        Text: "Opponent quit... Reload?",
+                    }
+                    b.Send(msg)
+                    a.Send(msg)
                 }
-                b.Out <- msg
-                a.Out <- msg
-            } else {
-                msg = Message{
-                    Cmd:  "msg",
-                    Text: "Opponent quit... Reload?",
-                }
-                b.Out <- msg
-                a.Out <- msg
+                break
             }
-            break
         }
         if msg.Cmd == "move" && msg.Turn == board.Turn() &&
             a.Color == board.Color() && board.Move(msg.Src, msg.Dst) {
@@ -147,40 +170,43 @@ func play(a, b *Player) {
                 msg.RemainingA, msg.RemainingB = b.Remaining, a.Remaining
             }
             a, b = b, a
-            a.Out <- msg
-            b.Out <- msg
+            a.Send(msg)
+            b.Send(msg)
 
             if board.Checkmate() {
                 msg = Message{
                     Cmd:  "msg",
                     Text: fmt.Sprintf("Checkmate: %v wins!", b),
                 }
-                b.Out <- msg
-                a.Out <- msg
+                b.Send(msg)
+                a.Send(msg)
                 return
             } else if board.Stalemate() {
                 msg = Message{
                     Cmd:  "msg",
-                    Text: fmt.Sprintf("Stalemate", b),
+                    Text: "Stalemate",
                 }
-                b.Out <- msg
-                a.Out <- msg
+                b.Send(msg)
+                a.Send(msg)
                 return
             }
         } else if msg.Cmd == "select" {
             msg.Moves = board.Moves(msg.Src)
-            a.Out <- msg
+            a.Send(msg)
         }
     }
 }
 
 // Serve the index page.
 func handleIndex(w http.ResponseWriter, r *http.Request) {
-    if r.URL.Path != "/" {
+    wsURL := fmt.Sprintf("ws://%s/ws", r.Host)
+    if r.URL.Path == "/ai" {
+        wsURL += "?ai=true"
+    } else if r.URL.Path != "/" {
         http.Error(w, "Not Found", http.StatusNotFound)
         return
     }
-    if err := tmpl.Execute(w, r.Host); err != nil {
+    if err := tmpl.Execute(w, wsURL); err != nil {
         log.Printf("tmpl.Execute: %v", err)
     }
 }
@@ -232,8 +258,12 @@ func handleWS(ws *websocket.Conn) {
 
     // Add the player to the pool of available players so that he can get
     // hooked up
+    reqAI := make(chan bool, 1)
+    if ws.Request().FormValue("ai") == "true" {
+        reqAI <- true
+    }
     out := make(chan Message, 1)
-    available <- &Player{Conn: ws, Out: out}
+    available <- &Player{Conn: ws, Out: out, ReqAI: reqAI}
 
     // Send the move commands from the game asynchronously, so that a slow
     // internet connection can not be simulated to use up the opponents
@@ -258,11 +288,16 @@ var listenAddr *string = flag.String("http", ":8000",
 
 func main() {
     runtime.GOMAXPROCS(runtime.NumCPU())
+    rand.Seed(time.Now().UnixNano())
     flag.Parse()
     if flag.NArg() > 0 {
         flag.Usage()
         return
     }
+
+    expvar.Publish("numplayers", expvar.Func(func() interface{} {
+        return atomic.LoadInt32(&numPlayers)
+    }))
 
     p, err := build.Default.Import(basePkg, "", build.FindOnly)
     if err != nil {

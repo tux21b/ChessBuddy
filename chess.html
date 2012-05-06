@@ -43,6 +43,7 @@
             </div>
             <div id="dlg-waiting" class="dialog">
                 <h3>Waiting for another player…</h3>
+                <p>(or <a href="/ai">play against the computer</a>)</p>
             </div>
             <div id="dlg-result" class="dialog">
                 <h3 id="result">Checkmate: White wins!</h3>
@@ -55,7 +56,7 @@
         <script type="text/javascript">
             var canvas = document.getElementById("board");
             var clocks = document.getElementById("clocks");
-            var chess = new ChessGame(canvas, clocks, "ws://{{.}}/ws");
+            var chess = new ChessGame(canvas, clocks, "{{.}}");
         </script>
 
         <footer>
