@@ -181,9 +181,7 @@ ChessGame.prototype.renderAnim = function(t) {
     ctx.textBaseline = "middle";
     ctx.fillStyle = "#000000";
 
-    if (t == undefined) {
-        t = Date.now();
-    }
+    var t = Date.now();
     var update = false;
     for (var a in this.anim) {
         var an = this.anim[a];
